@@ -179,6 +179,13 @@ export const defaultModelsOfProvider = {
 		'claude-3-opus-20240229',
 		'claude-3-sonnet-20240229',
 		'claude-3-haiku-20240307',
+		// Mistral models
+		'codestral-latest',
+		'devstral-small-latest',
+		'mistral-large-latest',
+		'mistral-medium-latest',
+		'ministral-3b-latest',
+		'ministral-8b-latest',
 	],
 
 
@@ -1503,12 +1510,13 @@ const modelSettingsOfProvider: { [providerName in ProviderName]: VoidStaticProvi
 	awsBedrock: awsBedrockSettings,
 	backendProxy: {
 		...openAISettings,
-		// Add Claude model capabilities to backend proxy
+		// Add Claude and Mistral model capabilities to backend proxy
 		modelOptions: {
 			...openAISettings.modelOptions,
 			...anthropicSettings.modelOptions, // Include Claude models
+			...mistralSettings.modelOptions, // Include Mistral models
 		},
-		// Override fallback to support both OpenAI and Anthropic models
+		// Override fallback to support OpenAI, Anthropic, and Mistral models
 		modelOptionsFallback: (modelName) => {
 			// Try OpenAI fallback first
 			const openAIResult = openAISettings.modelOptionsFallback(modelName);
@@ -1517,6 +1525,10 @@ const modelSettingsOfProvider: { [providerName in ProviderName]: VoidStaticProvi
 			// Try Anthropic fallback
 			const anthropicResult = anthropicSettings.modelOptionsFallback(modelName);
 			if (anthropicResult) return anthropicResult;
+
+			// Try Mistral fallback
+			const mistralResult = mistralSettings.modelOptionsFallback(modelName);
+			if (mistralResult) return mistralResult;
 
 			return null;
 		}

@@ -291,7 +291,7 @@ const determineProviderFromModel = (modelName: string): string => {
 	}
 
 	// Mistral models
-	if (lowerModelName.includes('mistral') || lowerModelName.includes('codestral') || lowerModelName.includes('mixtral')) {
+	if (lowerModelName.includes('mistral') || lowerModelName.includes('codestral') || lowerModelName.includes('mixtral') || lowerModelName.includes('devstral') || lowerModelName.includes('ministral')) {
 		return 'mistral'
 	}
 
@@ -522,6 +522,11 @@ const _sendBackendProxyFIM = async (params: SendFIMParams_Internal) => {
 	const thisConfig = settingsOfProvider.backendProxy
 	const endpoint = thisConfig.endpoint || 'http://localhost:3002'
 
+	// Determine actual provider when using backendProxy
+	const actualProviderName = providerName === 'backendProxy'
+		? determineProviderFromModel(modelName_)
+		: providerName
+
 	// Simple request payload - backend proxy handles ALL provider and model mapping
 	const requestPayload = {
 		prefix: prefix,
@@ -529,8 +534,8 @@ const _sendBackendProxyFIM = async (params: SendFIMParams_Internal) => {
 		stopTokens: stopTokens,
 		max_tokens: 300,
 		temperature: 0.7,
-		providerName: providerName,  // Send "backendProxy" as-is
-		modelName: modelName_        // Send original model name (e.g. "gpt-4o")
+		providerName: actualProviderName,  // Send actual provider name (e.g. "mistral", "openAI")
+		modelName: modelName_              // Send original model name (e.g. "codestral-latest")
 	}
 
 
