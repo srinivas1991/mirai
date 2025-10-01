@@ -1,20 +1,28 @@
 {
-  "name": "vscode-extensions",
-  "version": "0.0.1",
-  "license": "MIT",
-  "description": "Dependencies shared by all extensions",
-  "dependencies": {
-    "typescript": "^5.8.2"
-  },
-  "scripts": {
-    "postinstall": "node ./postinstall.mjs"
-  },
-  "devDependencies": {
-    "@parcel/watcher": "2.5.1",
-    "esbuild": "0.25.0",
-    "vscode-grammar-updater": "^1.1.0"
-  },
-  "overrides": {
-    "node-gyp-build": "4.8.1"
-  }
+	"name": "mirai-extensions",
+	"displayName": "Mirai Extensions Collection",
+	"description": "Collection of Mirai platform extensions for VS Code",
+	"version": "1.0.0",
+	"publisher": "mirai",
+	"private": true,
+	"scripts": {
+		"compile": "npm run compile:auth && npm run compile:figma && npm run compile:jira",
+		"compile:auth": "cd mirai-auth && npm install && npm run compile",
+		"compile:figma": "cd mirai-figma && npm install && npm run compile",
+		"compile:jira": "cd mirai-jira && npm install && npm run compile",
+		"watch": "npm run watch:auth & npm run watch:figma & npm run watch:jira",
+		"watch:auth": "cd mirai-auth && npm run watch",
+		"watch:figma": "cd mirai-figma && npm run watch",
+		"watch:jira": "cd mirai-jira && npm run watch",
+		"clean": "rm -rf */out */node_modules",
+		"test": "npm run test:auth && npm run test:figma && npm run test:jira",
+		"test:auth": "cd mirai-auth && npm test",
+		"test:figma": "cd mirai-figma && npm test",
+		"test:jira": "cd mirai-jira && npm test"
+	},
+	"devDependencies": {
+		"@types/vscode": "^1.74.0",
+		"@types/node": "16.x",
+		"typescript": "^4.9.4"
+	}
 }

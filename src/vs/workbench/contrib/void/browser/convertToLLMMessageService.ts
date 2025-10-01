@@ -271,7 +271,7 @@ const prepareOpenAIOrAnthropicMessages = ({
 	// A COMPLETE HACK: last message is system message for context purposes
 
 	const sysMsgParts: string[] = []
-	if (aiInstructions) sysMsgParts.push(`GUIDELINES (from the user's .voidrules file):\n${aiInstructions}`)
+	if (aiInstructions) sysMsgParts.push(`GUIDELINES (from the user's .mirairules file):\n${aiInstructions}`)
 	if (systemMessage) sysMsgParts.push(systemMessage)
 	const combinedSystemMessage = sysMsgParts.join('\n\n')
 
@@ -523,7 +523,7 @@ export interface IConvertToLLMMessageService {
 	readonly _serviceBrand: undefined;
 	prepareLLMSimpleMessages: (opts: { simpleMessages: SimpleLLMMessage[], systemMessage: string, modelSelection: ModelSelection | null, featureName: FeatureName }) => { messages: LLMChatMessage[], separateSystemMessage: string | undefined }
 	prepareLLMChatMessages: (opts: { chatMessages: ChatMessage[], chatMode: ChatMode, modelSelection: ModelSelection | null }) => Promise<{ messages: LLMChatMessage[], separateSystemMessage: string | undefined }>
-	prepareFIMMessage(opts: { messages: LLMFIMMessage, }): { prefix: string, suffix: string, stopTokens: string[] }
+	prepareFIMMessage(opts: { messages: LLMFIMMessage, }): Promise<{ prefix: string, suffix: string, stopTokens: string[] }>
 }
 
 export const IConvertToLLMMessageService = createDecorator<IConvertToLLMMessageService>('ConvertToLLMMessageService');
@@ -545,13 +545,13 @@ class ConvertToLLMMessageService extends Disposable implements IConvertToLLMMess
 		super()
 	}
 
-	// Read .voidrules files from workspace folders
+	// Read .mirairules files from workspace folders
 	private _getVoidRulesFileContents(): string {
 		try {
 			const workspaceFolders = this.workspaceContextService.getWorkspace().folders;
 			let voidRules = '';
 			for (const folder of workspaceFolders) {
-				const uri = URI.joinPath(folder.uri, '.voidrules')
+				const uri = URI.joinPath(folder.uri, '.mirairules')
 				const { model } = this.voidModelService.getModel(uri)
 				if (!model) continue
 				voidRules += model.getValue(EndOfLinePreference.LF) + '\n\n';
@@ -563,7 +563,7 @@ class ConvertToLLMMessageService extends Disposable implements IConvertToLLMMess
 		}
 	}
 
-	// Get combined AI instructions from settings and .voidrules files
+	// Get combined AI instructions from settings and .mirairules files
 	private _getCombinedAIInstructions(): string {
 		const globalAIInstructions = this.voidSettingsService.state.globalSettings.aiInstructions;
 		const voidRulesFileContent = this._getVoidRulesFileContents();
@@ -708,20 +708,26 @@ class ConvertToLLMMessageService extends Disposable implements IConvertToLLMMess
 
 	// --- FIM ---
 
-	prepareFIMMessage: IConvertToLLMMessageService['prepareFIMMessage'] = ({ messages }) => {
-		// Get combined AI instructions with the provided aiInstructions as the base
-		const combinedInstructions = this._getCombinedAIInstructions();
+	prepareFIMMessage: IConvertToLLMMessageService['prepareFIMMessage'] = async ({ messages }) => {
+		// LEARNED: Keep FIM simple and clean - context pollution hurts quality
+		// Direct OpenAI FIM is much better than backend proxy because it's focused
 
-		let prefix = `\
-${!combinedInstructions ? '' : `\
-// Instructions:
-// Do not output an explanation. Try to avoid outputting comments. Only output the middle code.
-${combinedInstructions.split('\n').map(line => `//${line}`).join('\n')}`}
-
-${messages.prefix}`
-
+		const prefix = messages.prefix
 		const suffix = messages.suffix
-		const stopTokens = messages.stopTokens
+		// Remove aggressive stop tokens that break multiline completions
+		const stopTokens = messages.stopTokens?.filter(token =>
+			// Keep only meaningful stop tokens, not newlines
+			token !== '\n' && token !== '\r\n' && token !== '\r'
+		) || []
+
+		// Simple logging for debugging
+		console.log('🎯 [FIM] Clean message prepared:', {
+			prefixLength: prefix.length,
+			suffixLength: suffix?.length || 0,
+			stopTokenCount: stopTokens.length,
+			approach: 'clean_simple_focused'
+		})
+
 		return { prefix, suffix, stopTokens }
 	}
 

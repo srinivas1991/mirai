@@ -196,7 +196,7 @@ export class ThemeMainService extends Disposable implements IThemeMainService {
 		if (workspace) {
 			splashOverride = { ...this.getWindowSplashOverride() }; // make a copy for modifications
 
-			const [auxiliarySideBarWidth, workspaceIds] = splashOverride.layoutInfo.auxiliarySideBarWidth;
+			const [auxiliarySideBarWidth, workspaceIds] = splashOverride.layoutInfo.auxiliarySideBarWidth ?? [0, []];
 			if (splash.layoutInfo?.auxiliarySideBarWidth) {
 				if (auxiliarySideBarWidth !== splash.layoutInfo.auxiliarySideBarWidth) {
 					splashOverride.layoutInfo.auxiliarySideBarWidth[0] = splash.layoutInfo.auxiliarySideBarWidth;
@@ -237,9 +237,10 @@ export class ThemeMainService extends Disposable implements IThemeMainService {
 		// Apply workspace specific overrides
 		let auxiliarySideBarWidthOverride: number | undefined;
 		if (workspace) {
-			const [auxiliarySideBarWidth, workspaceIds] = this.getWindowSplashOverride().layoutInfo.auxiliarySideBarWidth;
+			const auxiliarySideBarWidth = this.getWindowSplashOverride().layoutInfo.auxiliarySideBarWidth ?? [0, []];
+			const [width, workspaceIds] = auxiliarySideBarWidth;
 			if (workspaceIds.includes(workspace.id)) {
-				auxiliarySideBarWidthOverride = auxiliarySideBarWidth;
+				auxiliarySideBarWidthOverride = width;
 			}
 		}
 

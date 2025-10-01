@@ -7,8 +7,8 @@ import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import { ProviderName, SettingName, displayInfoOfSettingName, providerNames, VoidStatefulModelInfo, customSettingNamesOfProvider, RefreshableProviderName, refreshableProviderNames, displayInfoOfProviderName, nonlocalProviderNames, localProviderNames, GlobalSettingName, featureNames, displayInfoOfFeatureName, isProviderNameDisabled, FeatureName, hasDownloadButtonsOnModelsProviderNames, subTextMdOfProviderName } from '../../../../common/voidSettingsTypes.js'
 import ErrorBoundary from '../sidebar-tsx/ErrorBoundary.js'
 import { VoidButtonBgDarken, VoidCustomDropdownBox, VoidInputBox2, VoidSimpleInputBox, VoidSwitch } from '../util/inputs.js'
-import { useAccessor, useIsDark, useIsOptedOut, useRefreshModelListener, useRefreshModelState, useSettingsState } from '../util/services.js'
-import { X, RefreshCw, Loader2, Check, Asterisk, Plus } from 'lucide-react'
+import { useAccessor, useIsDark, useIsOptedOut, useRefreshModelListener, useRefreshModelState, useSettingsState, useMiraiAuthState } from '../util/services.js'
+import { X, RefreshCw, Loader2, Check, Asterisk, Plus, User, Shield, CheckCircle2, AlertCircle } from 'lucide-react'
 import { URI } from '../../../../../../../base/common/uri.js'
 import { ModelDropdown } from './ModelDropdown.js'
 import { ChatMarkdownRender } from '../markdown/ChatMarkdownRender.js'
@@ -44,6 +44,180 @@ const ButtonLeftTextRightOption = ({ text, leftButton }: { text: string, leftBut
 	</div>
 }
 
+const MiraiAuthSection = () => {
+	const { session, isSignedIn, isLoading } = useMiraiAuthState()
+	const accessor = useAccessor()
+	const commandService = accessor.get('ICommandService')
+	const isDark = useIsDark()
+
+	if (isLoading) {
+		return (
+			<div className='mt-8'>
+				<h2 className='text-3xl mb-6 flex items-center gap-3'>
+					<div className='w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center'>
+						<Shield className='w-4 h-4 text-white' />
+					</div>
+					Mirai AI Authentication
+				</h2>
+				<div className={`p-6 rounded-xl border ${isDark ? 'bg-zinc-800/50 border-zinc-700' : 'bg-gray-50 border-gray-200'}`}>
+					<div className='flex items-center gap-3 mb-4'>
+						<Loader2 className='w-5 h-5 animate-spin text-blue-500' />
+						<span className='text-void-fg-2 font-medium'>Checking authentication status...</span>
+					</div>
+					<p className='text-void-fg-3 text-sm'>Please wait while we verify your Mirai account.</p>
+				</div>
+			</div>
+		)
+	}
+
+	if (isSignedIn) {
+		const userName = session?.account?.label || 'Unknown User'
+		const userEmail = session?.account?.id || ''
+		const userInitials = userName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
+
+		return (
+			<div className='mt-8'>
+				<h2 className='text-3xl mb-6 flex items-center gap-3'>
+					<div className='w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center'>
+						<Shield className='w-4 h-4 text-white' />
+					</div>
+					Mirai AI Authentication
+				</h2>
+				<div className={`p-6 rounded-xl border ${isDark ? 'bg-zinc-800/50 border-zinc-700' : 'bg-gray-50 border-gray-200'}`}>
+					{/* Status Header */}
+					<div className='flex items-center gap-3 mb-4'>
+						<CheckCircle2 className='w-5 h-5 text-green-500' />
+						<span className='text-green-600 dark:text-green-400 font-medium'>Successfully authenticated</span>
+					</div>
+
+					{/* User Profile Card */}
+					<div className={`p-4 rounded-lg ${isDark ? 'bg-zinc-900/50' : 'bg-white'} border ${isDark ? 'border-zinc-600' : 'border-gray-200'} mb-6`}>
+						<div className='flex items-center gap-4'>
+							{/* Avatar */}
+							<div className='w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-lg shadow-lg'>
+								{userInitials || <User className='w-6 h-6' />}
+							</div>
+
+							{/* User Info */}
+							<div className='flex-1'>
+								<h3 className='font-semibold text-void-fg-1 text-lg'>{userName}</h3>
+								{userEmail && (
+									<p className='text-void-fg-3 text-sm'>{userEmail}</p>
+								)}
+								<div className='flex items-center gap-2 mt-1'>
+									<div className='w-2 h-2 rounded-full bg-green-500'></div>
+									<span className='text-green-600 dark:text-green-400 text-xs font-medium'>Active</span>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					{/* Features */}
+					<div className='mb-6'>
+						<h4 className='text-void-fg-2 font-medium mb-3'>Available Features</h4>
+						<div className='grid grid-cols-1 gap-2'>
+							<div className='flex items-center gap-3 text-sm'>
+								<CheckCircle2 className='w-4 h-4 text-green-500' />
+								<span className='text-void-fg-2'>AI-powered code assistance</span>
+							</div>
+							<div className='flex items-center gap-3 text-sm'>
+								<CheckCircle2 className='w-4 h-4 text-green-500' />
+								<span className='text-void-fg-2'>Cross-extension integration</span>
+							</div>
+							<div className='flex items-center gap-3 text-sm'>
+								<CheckCircle2 className='w-4 h-4 text-green-500' />
+								<span className='text-void-fg-2'>Enhanced productivity tools</span>
+							</div>
+						</div>
+					</div>
+
+					{/* Actions */}
+					<div className='flex gap-3'>
+						<VoidButtonBgDarken
+							className='px-6 py-2.5 text-sm font-medium hover:scale-105 transition-transform'
+							onClick={async () => {
+								try {
+									await commandService.executeCommand('mirai-auth.signOut');
+								} catch (error) {
+									console.error('Failed to sign out of Mirai:', error);
+								}
+							}}
+						>
+							Sign Out
+						</VoidButtonBgDarken>
+					</div>
+				</div>
+			</div>
+		)
+	}
+
+	// Not signed in state
+	return (
+		<div className='mt-8'>
+			<h2 className='text-3xl mb-6 flex items-center gap-3'>
+				<div className='w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center'>
+					<Shield className='w-4 h-4 text-white' />
+				</div>
+				Mirai AI Authentication
+			</h2>
+			<div className={`p-6 rounded-xl border ${isDark ? 'bg-zinc-800/50 border-zinc-700' : 'bg-gray-50 border-gray-200'}`}>
+				{/* Status Header */}
+				<div className='flex items-center gap-3 mb-4'>
+					<AlertCircle className='w-5 h-5 text-amber-500' />
+					<span className='text-amber-600 dark:text-amber-400 font-medium'>Authentication required</span>
+				</div>
+
+				{/* Description */}
+				<div className='mb-6'>
+					<p className='text-void-fg-2 mb-4'>
+						Sign in to Mirai to unlock powerful AI features across all your extensions and enhance your development workflow.
+					</p>
+
+					{/* Benefits */}
+					<div className='space-y-2'>
+						<div className='flex items-center gap-3 text-sm'>
+							<div className='w-4 h-4 rounded-full bg-blue-500/20 flex items-center justify-center'>
+								<Check className='w-2.5 h-2.5 text-blue-500' />
+							</div>
+							<span className='text-void-fg-3'>Intelligent code completions and suggestions</span>
+						</div>
+						<div className='flex items-center gap-3 text-sm'>
+							<div className='w-4 h-4 rounded-full bg-blue-500/20 flex items-center justify-center'>
+								<Check className='w-2.5 h-2.5 text-blue-500' />
+							</div>
+							<span className='text-void-fg-3'>Seamless integration across all extensions</span>
+						</div>
+						<div className='flex items-center gap-3 text-sm'>
+							<div className='w-4 h-4 rounded-full bg-blue-500/20 flex items-center justify-center'>
+								<Check className='w-2.5 h-2.5 text-blue-500' />
+							</div>
+							<span className='text-void-fg-3'>Enhanced productivity and workflow automation</span>
+						</div>
+					</div>
+				</div>
+
+				{/* Sign In Button */}
+				<VoidButtonBgDarken
+					className='px-8 py-3 text-sm font-medium bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0 rounded-lg hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl'
+					onClick={async () => {
+						try {
+							console.log('🔍 [DEBUG] Triggering Mirai auth...');
+							await commandService.executeCommand('mirai-auth.test');
+						} catch (error) {
+							console.error('Failed to authenticate with Mirai:', error);
+						}
+					}}
+				>
+					<div className='flex items-center gap-2'>
+						<Shield className='w-4 h-4' />
+						Sign in to Mirai
+					</div>
+				</VoidButtonBgDarken>
+			</div>
+		</div>
+	)
+}
+
 // models
 const RefreshModelButton = ({ providerName }: { providerName: RefreshableProviderName }) => {
 
@@ -58,7 +232,9 @@ const RefreshModelButton = ({ providerName }: { providerName: RefreshableProvide
 	useRefreshModelListener(
 		useCallback((providerName2, refreshModelState) => {
 			if (providerName2 !== providerName) return
-			const { state } = refreshModelState[providerName]
+			const refreshState = refreshModelState[providerName]
+			if (!refreshState) return // Safety guard for non-refreshable providers
+			const { state } = refreshState
 			if (!(state === 'finished' || state === 'error')) return
 			// now we know we just entered 'finished' state for this providerName
 			setJustFinished(state)
@@ -67,7 +243,9 @@ const RefreshModelButton = ({ providerName }: { providerName: RefreshableProvide
 		}, [providerName])
 	)
 
-	const { state } = refreshModelState[providerName]
+	const refreshState = refreshModelState[providerName]
+	if (!refreshState) return null // Safety guard for non-refreshable providers
+	const { state } = refreshState
 
 	const { title: providerTitle } = displayInfoOfProviderName(providerName)
 
@@ -321,10 +499,10 @@ const SimpleModelSettingsDialog = ({
 
 				{/* Display model recognition status */}
 				<div className="text-sm text-void-fg-3 mb-4">
-					{type === 'default' ? `${modelName} comes packaged with Void, so you shouldn't need to change these settings.`
+					{type === 'default' ? `${modelName} comes packaged with Mirai, so you shouldn't need to change these settings.`
 						: isUnrecognizedModel
-							? `Model not recognized by Void.`
-							: `Void recognizes ${modelName} ("${recognizedModelName}").`}
+							? `Model not recognized by Mirai.`
+							: `Mirai recognizes ${modelName} ("${recognizedModelName}").`}
 				</div>
 
 
@@ -617,6 +795,8 @@ const ProviderSetting = ({ providerName, settingName, subTextMd }: { providerNam
 	const accessor = useAccessor()
 	const voidSettingsService = accessor.get('IVoidSettingsService')
 	const settingsState = useSettingsState()
+	const isProduction = voidSettingsService.isProduction
+	const productionFeatures = voidSettingsService.productionFeatures
 
 	const settingValue = settingsState.settingsOfProvider[providerName][settingName] as string // this should always be a string in this component
 	if (typeof settingValue !== 'string') {
@@ -624,20 +804,36 @@ const ProviderSetting = ({ providerName, settingName, subTextMd }: { providerNam
 		return
 	}
 
+	// Check if this setting is locked in production mode
+	const isLocked = isProduction && (
+		(settingName.includes('apiKey') && !productionFeatures.allowLLMKeyConfiguration) ||
+		(settingName.includes('endpoint') && !productionFeatures.allowProviderConfiguration) ||
+		!productionFeatures.allowProviderConfiguration
+	);
+
 	// Create a stable callback reference using useCallback with proper dependencies
 	const handleChangeValue = useCallback((newVal: string) => {
+		if (isLocked) return; // Prevent changes in production mode
 		voidSettingsService.setSettingOfProvider(providerName, settingName, newVal)
-	}, [voidSettingsService, providerName, settingName]);
+	}, [voidSettingsService, providerName, settingName, isLocked]);
 
 	return <ErrorBoundary>
 		<div className='my-1'>
-			<VoidSimpleInputBox
-				value={settingValue}
-				onChangeValue={handleChangeValue}
-				placeholder={`${settingTitle} (${placeholder})`}
-				passwordBlur={isPasswordField}
-				compact={true}
-			/>
+			<div className={`relative ${isLocked ? 'opacity-50' : ''}`}>
+				<VoidSimpleInputBox
+					value={settingValue}
+					onChangeValue={handleChangeValue}
+					placeholder={isLocked ? `${settingTitle} (Locked in production)` : `${settingTitle} (${placeholder})`}
+					passwordBlur={isPasswordField}
+					compact={true}
+					disabled={isLocked}
+				/>
+				{isLocked && (
+					<div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+						<Shield className="w-3 h-3 text-gray-400" />
+					</div>
+				)}
+			</div>
 			{!subTextMd ? null : <div className='py-1 px-3 opacity-50 text-sm'>
 				{subTextMd}
 			</div>}
@@ -1031,6 +1227,10 @@ const MCPServersList = () => {
 
 export const Settings = () => {
 	const isDark = useIsDark()
+	const accessor = useAccessor()
+	const voidSettingsService = accessor.get('IVoidSettingsService')
+	const isProduction = voidSettingsService.isProduction
+	const productionFeatures = voidSettingsService.productionFeatures
 	// ─── sidebar nav ──────────────────────────
 	const [selectedSection, setSelectedSection] =
 		useState<Tab>('models');
@@ -1045,12 +1245,10 @@ export const Settings = () => {
 		{ tab: 'all', label: 'All Settings' },
 	];
 	const shouldShowTab = (tab: Tab) => selectedSection === 'all' || selectedSection === tab;
-	const accessor = useAccessor()
 	const commandService = accessor.get('ICommandService')
 	const environmentService = accessor.get('IEnvironmentService')
 	const nativeHostService = accessor.get('INativeHostService')
 	const settingsState = useSettingsState()
-	const voidSettingsService = accessor.get('IVoidSettingsService')
 	const chatThreadsService = accessor.get('IChatThreadService')
 	const notificationService = accessor.get('INotificationService')
 	const mcpService = accessor.get('IMCPService')
@@ -1161,7 +1359,24 @@ export const Settings = () => {
 
 					<div className='max-w-3xl'>
 
-						<h1 className='text-2xl w-full'>{`Void's Settings`}</h1>
+						<h1 className='text-2xl w-full flex items-center gap-2'>
+							{isProduction ? 'Mirai Settings (Production Mode)' : 'Mirai Settings'}
+							{isProduction && <Shield className="w-5 h-5 text-yellow-600" />}
+						</h1>
+
+						{isProduction && (
+							<div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-md p-3 my-4">
+								<div className="flex items-center gap-2">
+									<AlertCircle className="w-4 h-4 text-yellow-600" />
+									<p className="text-sm text-yellow-800 dark:text-yellow-200 font-medium">
+										Production Mode Active
+									</p>
+								</div>
+								<p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
+									Most settings are locked for security and stability. Contact your administrator for configuration changes.
+								</p>
+							</div>
+						)}
 
 						<div className='w-full h-[1px] my-2' />
 
@@ -1182,7 +1397,11 @@ export const Settings = () => {
 									<div className='w-full h-[1px] my-4' />
 									<AutoDetectLocalModelsToggle />
 									<RefreshableModels />
+
+									{/* Mirai Authentication section - IN MODELS TAB */}
+									<MiraiAuthSection />
 								</ErrorBoundary>
+								<div className='w-full h-[1px] my-4' />
 							</div>
 
 							{/* Local Providers section */}
@@ -1391,8 +1610,13 @@ export const Settings = () => {
 							</div>
 
 							{/* General section */}
-							<div className={`${shouldShowTab('general') ? `` : 'hidden'} flex flex-col gap-12`}>
-								{/* One-Click Switch section */}
+						<div className={`${shouldShowTab('general') ? `` : 'hidden'} flex flex-col gap-12`}>
+							{/* Mirai Authentication section */}
+							<ErrorBoundary>
+								<MiraiAuthSection />
+							</ErrorBoundary>
+
+							{/* One-Click Switch section */}
 								<div>
 									<ErrorBoundary>
 										<h2 className='text-3xl mb-2'>One-Click Switch</h2>
@@ -1440,8 +1664,6 @@ export const Settings = () => {
 										</div>
 									</div>
 								</div>
-
-
 
 								{/* Built-in Settings section */}
 								<div>
@@ -1496,7 +1718,7 @@ export const Settings = () => {
 									<h4 className={`text-void-fg-3 mb-4`}>
 										<ChatMarkdownRender inPTag={true} string={`
 System instructions to include with all AI requests.
-Alternatively, place a \`.voidrules\` file in the root of your workspace.
+Alternatively, place a \`.mirairules\` file in the root of your workspace.
 								`} chatMessageLocation={undefined} />
 									</h4>
 									<ErrorBoundary>

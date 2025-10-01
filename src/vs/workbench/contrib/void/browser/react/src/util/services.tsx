@@ -21,7 +21,7 @@ import { IThemeService } from '../../../../../../../platform/theme/common/themeS
 import { ILLMMessageService } from '../../../../common/sendLLMMessageService.js';
 import { IRefreshModelService } from '../../../../../../../workbench/contrib/void/common/refreshModelService.js';
 import { IVoidSettingsService } from '../../../../../../../workbench/contrib/void/common/voidSettingsService.js';
-import { IExtensionTransferService } from '../../../../../../../workbench/contrib/void/browser/extensionTransferService.js'
+import { IExtensionTransferService } from '../../../../../../../workbench/contrib/void/browser/extensionTransferService.js';
 
 import { IInstantiationService } from '../../../../../../../platform/instantiation/common/instantiation.js'
 import { ICodeEditorService } from '../../../../../../../editor/browser/services/codeEditorService.js'
@@ -54,6 +54,7 @@ import { IExtensionManagementService } from '../../../../../../../platform/exten
 import { IMCPService } from '../../../../common/mcpService.js';
 import { IStorageService, StorageScope } from '../../../../../../../platform/storage/common/storage.js'
 import { OPT_OUT_KEY } from '../../../../common/storageKeys.js'
+import { IAuthenticationService } from '../../../../../../../workbench/services/authentication/common/authentication.js'
 
 
 // normally to do this you'd use a useEffect that calls .onDidChangeState(), but useEffect mounts too late and misses initial state changes
@@ -82,6 +83,7 @@ const commandBarURIStateListeners: Set<(uri: URI) => void> = new Set();
 const activeURIListeners: Set<(uri: URI | null) => void> = new Set();
 
 const mcpListeners: Set<() => void> = new Set()
+const miraiAuthListeners: Set<() => void> = new Set()
 
 
 // must call this before you can use any of the hooks below
@@ -101,9 +103,10 @@ export const _registerServices = (accessor: ServicesAccessor) => {
 		voidCommandBarService: accessor.get(IVoidCommandBarService),
 		modelService: accessor.get(IModelService),
 		mcpService: accessor.get(IMCPService),
+		authenticationService: accessor.get(IAuthenticationService),
 	}
 
-	const { settingsStateService, chatThreadsStateService, refreshModelService, themeService, editCodeService, voidCommandBarService, modelService, mcpService } = stateServices
+	const { settingsStateService, chatThreadsStateService, refreshModelService, themeService, editCodeService, voidCommandBarService, modelService, mcpService, authenticationService } = stateServices
 
 
 
@@ -176,6 +179,15 @@ export const _registerServices = (accessor: ServicesAccessor) => {
 		})
 	)
 
+	// Listen for authentication session changes specifically for Mirai
+	disposables.push(
+		authenticationService.onDidChangeSessions((e) => {
+			if (e.providerId === 'mirai') {
+				miraiAuthListeners.forEach(l => l())
+			}
+		})
+	)
+
 
 	return disposables
 }
@@ -229,6 +241,7 @@ const getReactAccessor = (accessor: ServicesAccessor) => {
 		IMCPService: accessor.get(IMCPService),
 
 		IStorageService: accessor.get(IStorageService),
+		IAuthenticationService: accessor.get(IAuthenticationService),
 
 	} as const
 	return reactAccessor
@@ -426,3 +439,47 @@ export const useIsOptedOut = () => {
 
 	return s
 }
+
+export const useMiraiAuthState = () => {
+	const accessor = useAccessor()
+	const authenticationService = accessor.get('IAuthenticationService')
+
+	const getMiraiSession = useCallback(async () => {
+		try {
+			const sessions = await authenticationService.getSessions('mirai')
+			return sessions.length > 0 ? sessions[0] : null
+		} catch (error) {
+			console.error('Failed to get Mirai session:', error)
+			return null
+		}
+	}, [authenticationService])
+
+	const [session, setSession] = useState<any>(null)
+	const [isLoading, setIsLoading] = useState(true)
+
+	const updateSession = useCallback(async () => {
+		setIsLoading(true)
+		const currentSession = await getMiraiSession()
+		setSession(currentSession)
+		setIsLoading(false)
+	}, [getMiraiSession])
+
+	useEffect(() => {
+		updateSession()
+	}, [updateSession])
+
+	useEffect(() => {
+		const listener = () => {
+			updateSession()
+		}
+		miraiAuthListeners.add(listener)
+		return () => { miraiAuthListeners.delete(listener) }
+	}, [updateSession])
+
+	return {
+		session,
+		isSignedIn: !!session,
+		isLoading
+	}
+}
+

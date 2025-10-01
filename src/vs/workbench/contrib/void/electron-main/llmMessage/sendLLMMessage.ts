@@ -9,6 +9,7 @@ import { displayInfoOfProviderName } from '../../common/voidSettingsTypes.js';
 import { sendLLMMessageToProviderImplementation } from './sendLLMMessage.impl.js';
 
 
+
 export const sendLLMMessage = async ({
 	messagesType,
 	messages: messages_,
@@ -24,6 +25,7 @@ export const sendLLMMessage = async ({
 	chatMode,
 	separateSystemMessage,
 	mcpTools,
+	miraiToken,
 }: SendLLMMessageParams,
 
 	metricsService: IMetricsService
@@ -31,6 +33,30 @@ export const sendLLMMessage = async ({
 
 
 	const { providerName, modelName } = modelSelection
+
+
+	// Collect token usage data to pass to renderer process
+	let collectedTokenUsage: any = null;
+
+	const reportTokenUsage = async (usage: any, requestType: 'chat' | 'completion' | 'fim') => {
+		// Store the token usage data to pass to renderer process
+		collectedTokenUsage = {
+			providerId: providerName,
+			modelId: modelName,
+			promptTokens: usage.prompt_tokens || usage.input_tokens,
+			completionTokens: usage.completion_tokens || usage.output_tokens,
+			totalTokens: usage.total_tokens ||
+				((usage.input_tokens || 0) + (usage.output_tokens || 0)) ||
+				((usage.prompt_tokens || 0) + (usage.completion_tokens || 0)),
+			timestamp: Date.now(),
+			requestType,
+			rawUsage: usage, // Keep original usage data for debugging
+			metaData: {
+				loggingName,
+				...loggingExtras
+			}
+		};
+	}
 
 	// only captures number of messages and message "shape", no actual code, instructions, prompts, etc
 	const captureLLMEvent = (eventId: string, extras?: object) => {
@@ -69,7 +95,19 @@ export const sendLLMMessage = async ({
 		const { fullText, fullReasoning, toolCall } = params
 		if (_didAbort) return
 		captureLLMEvent(`${loggingName} - Received Full Message`, { messageLength: fullText.length, reasoningLength: fullReasoning?.length, duration: new Date().getMilliseconds() - submit_time.getMilliseconds(), toolCallName: toolCall?.name })
-		onFinalMessage_(params)
+
+		// Include token usage data for renderer process reporting
+		const finalParams = {
+			...params,
+			tokenUsage: collectedTokenUsage
+		};
+
+		console.log('🔄 Sending onFinalMessage with token usage data:', {
+			hasTokenUsage: !!collectedTokenUsage,
+			tokenUsage: collectedTokenUsage
+		});
+
+		onFinalMessage_(finalParams)
 	}
 
 	const onError: OnError = ({ message: errorMessage, fullError }) => {
@@ -101,6 +139,8 @@ export const sendLLMMessage = async ({
 
 
 	try {
+		console.log(`🎯 [VS CODE] sendLLMMessage called with provider: "${providerName}", messageType: "${messagesType}"`)
+
 		const implementation = sendLLMMessageToProviderImplementation[providerName]
 		if (!implementation) {
 			onError({ message: `Error: Provider "${providerName}" not recognized.`, fullError: null })
@@ -108,12 +148,12 @@ export const sendLLMMessage = async ({
 		}
 		const { sendFIM, sendChat } = implementation
 		if (messagesType === 'chatMessages') {
-			await sendChat({ messages: messages_, onText, onFinalMessage, onError, settingsOfProvider, modelSelectionOptions, overridesOfModel, modelName, _setAborter, providerName, separateSystemMessage, chatMode, mcpTools })
+			await sendChat({ messages: messages_, onText, onFinalMessage, onError, settingsOfProvider, modelSelectionOptions, overridesOfModel, modelName, _setAborter, providerName, separateSystemMessage, chatMode, mcpTools, reportTokenUsage, miraiToken })
 			return
 		}
 		if (messagesType === 'FIMMessage') {
 			if (sendFIM) {
-				await sendFIM({ messages: messages_, onText, onFinalMessage, onError, settingsOfProvider, modelSelectionOptions, overridesOfModel, modelName, _setAborter, providerName, separateSystemMessage })
+				await sendFIM({ messages: messages_, onText, onFinalMessage, onError, settingsOfProvider, modelSelectionOptions, overridesOfModel, modelName, _setAborter, providerName, separateSystemMessage, reportTokenUsage, miraiToken })
 				return
 			}
 			onError({ message: `Error running Autocomplete with ${providerName} - ${modelName}.`, fullError: null })

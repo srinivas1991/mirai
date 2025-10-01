@@ -1,0 +1,22 @@
+# OAuth configuration with sensitive credentials
+oauth.config.js
+
+# Compiled output
+out/
+*.js.map
+
+# Node modules
+node_modules/
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# IDE files
+.vscode/settings.json
+*.swp
+*.swo
+
+
+

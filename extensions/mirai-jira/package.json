@@ -1,0 +1,452 @@
+{
+	"name": "mirai-jira",
+	"displayName": "Mirai Jira Integration",
+	"description": "Seamlessly integrate Jira issues into your Mirai workflow",
+	"version": "1.0.0",
+	"publisher": "mirai",
+	"engines": {
+		"vscode": "^1.74.0"
+	},
+	"categories": [
+		"Other",
+		"Project Management"
+	],
+	"keywords": [
+		"jira",
+		"issues",
+		"project-management",
+		"tickets",
+		"agile"
+	],
+	"activationEvents": [
+		"onCommand:mirai-jira.openJiraPanel",
+		"onCommand:mirai-jira.refreshIssues",
+		"onCommand:mirai-jira.createIssue",
+		"onCommand:mirai-jira.authenticateWithToken",
+		"onCommand:mirai-jira.authenticateWithOAuth",
+		"onCommand:mirai-jira.clearToken",
+		"onCommand:mirai-jira.analyzeIssueWithChat",
+		"onCommand:mirai-jira.generateCodeFromIssue",
+		"onCommand:mirai-jira.sendIssueToChat",
+		"onView:mirai-jira-panel"
+	],
+	"main": "./out/extension.js",
+	"contributes": {
+		"commands": [
+			{
+				"command": "mirai-jira.openJiraPanel",
+				"title": "Open Jira Panel",
+				"category": "Mirai Jira",
+				"icon": "$(project)"
+			},
+			{
+				"command": "mirai-jira.refreshIssues",
+				"title": "Refresh Issues",
+				"category": "Mirai Jira",
+				"icon": "$(refresh)"
+			},
+			{
+				"command": "mirai-jira.createIssue",
+				"title": "Create New Issue",
+				"category": "Mirai Jira",
+				"icon": "$(add)"
+			},
+			{
+				"command": "mirai-jira.authenticateWithToken",
+				"title": "Authenticate with API Token",
+				"category": "Mirai Jira",
+				"icon": "$(key)"
+			},
+			{
+				"command": "mirai-jira.authenticateWithOAuth",
+				"title": "Login with Jira",
+				"category": "Mirai Jira",
+				"icon": "$(sign-in)"
+			},
+			{
+				"command": "mirai-jira.clearToken",
+				"title": "Clear Saved Token",
+				"category": "Mirai Jira",
+				"icon": "$(trash)"
+			},
+			{
+				"command": "mirai-jira.analyzeIssueWithChat",
+				"title": "Analyze Issue with AI Chat",
+				"category": "Mirai Jira",
+				"icon": "$(robot)"
+			},
+			{
+				"command": "mirai-jira.generateCodeFromIssue",
+				"title": "Generate Code from Issue",
+				"category": "Mirai Jira",
+				"icon": "$(code)"
+			},
+			{
+				"command": "mirai-jira.sendIssueToChat",
+				"title": "Send Issue to AI Chat",
+				"category": "Mirai Jira",
+				"icon": "$(comment-discussion)"
+			},
+			{
+				"command": "mirai-jira.viewIssueDetails",
+				"title": "View Issue Details",
+				"category": "Mirai Jira",
+				"icon": "$(eye)"
+			},
+			{
+				"command": "mirai-jira.showConfig",
+				"title": "Show Configuration",
+				"category": "Mirai Jira",
+				"icon": "$(gear)"
+			},
+			{
+				"command": "mirai-jira.toggleViewMode",
+				"title": "Toggle View Mode (Projects/Sprint/Status)",
+				"category": "Mirai Jira",
+				"icon": "$(list-tree)"
+			},
+			{
+				"command": "mirai-jira.filterAssignedToMe",
+				"title": "Filter: Assigned to Me",
+				"category": "Mirai Jira",
+				"icon": "$(person)"
+			},
+			{
+				"command": "mirai-jira.filterRecentlyUpdated",
+				"title": "Filter: Recently Updated",
+				"category": "Mirai Jira",
+				"icon": "$(clock)"
+			},
+			{
+				"command": "mirai-jira.filterBugsOnly",
+				"title": "Filter: Bugs Only",
+				"category": "Mirai Jira",
+				"icon": "$(bug)"
+			},
+			{
+				"command": "mirai-jira.clearFilters",
+				"title": "Clear All Filters",
+				"category": "Mirai Jira",
+				"icon": "$(clear-all)"
+			},
+			{
+				"command": "mirai-jira.createBranch",
+				"title": "Create Branch for Ticket",
+				"category": "Mirai Jira",
+				"icon": "$(git-branch)"
+			},
+			{
+				"command": "mirai-jira.createPR",
+				"title": "Create Pull Request",
+				"category": "Mirai Jira",
+				"icon": "$(git-pull-request)"
+			},
+			{
+				"command": "mirai-jira.checkoutBranch",
+				"title": "Checkout Branch",
+				"category": "Mirai Jira",
+				"icon": "$(git-branch)"
+			},
+			{
+				"command": "mirai-jira.showCurrentBranch",
+				"title": "Show Current Branch",
+				"category": "Mirai Jira",
+				"icon": "$(info)"
+			},
+			{
+				"command": "mirai-jira.analyzeSpecificSprint",
+				"title": "Analyze Sprint with AI",
+				"category": "Mirai Jira",
+				"icon": "$(graph)"
+			},
+			{
+				"command": "mirai-jira.configureGitHubToken",
+				"title": "Configure GitHub Token",
+				"category": "Mirai Jira",
+				"icon": "$(key)"
+			},
+			{
+				"command": "mirai-connections.openConnectionsView",
+				"title": "Manage Connections",
+				"category": "Mirai",
+				"icon": "$(plug)"
+			},
+			{
+				"command": "mirai-jira.listChatCommands",
+				"title": "List Available Chat Commands",
+				"category": "Mirai Jira",
+				"icon": "$(list-unordered)"
+			},
+			{
+				"command": "mirai-jira.discussIssueWithAI",
+				"title": "Discuss with AI",
+				"category": "Mirai Jira",
+				"icon": "$(comment-discussion)"
+			},
+			{
+				"command": "mirai-jira.estimateComplexity",
+				"title": "Estimate Work",
+				"category": "Mirai Jira",
+				"icon": "$(calculator)"
+			}
+		],
+		"views": {
+			"mirai-jira": [
+				{
+					"id": "mirai-jira-login",
+					"name": "Connect to Jira",
+					"when": "!mirai-jira:authenticated"
+				},
+				{
+					"id": "mirai-jira-issues",
+					"name": "Issues",
+					"when": "mirai-jira:authenticated"
+				},
+				{
+					"id": "mirai-jira-ai",
+					"name": "AI Tools",
+					"type": "webview",
+					"when": "mirai-jira:authenticated"
+				}
+			],
+			"mirai-connections": [
+				{
+					"id": "mirai-connections-view",
+					"name": "Connections",
+					"type": "webview"
+				}
+			]
+		},
+		"viewsContainers": {
+			"activitybar": [
+				{
+					"id": "mirai-jira",
+					"title": "Jira",
+					"icon": "$(project)"
+				},
+				{
+					"id": "mirai-connections",
+					"title": "Connections",
+					"icon": "$(plug)"
+				}
+			]
+		},
+		"viewsWelcome": [
+			{
+				"view": "mirai-jira-login",
+				"contents": "Connect to your Jira instance to access issues and use AI-powered analysis.\n\n[🔐 Login with Jira](command:mirai-jira.authenticateWithOAuth)\n\n[🔑 Setup Personal Token](command:mirai-jira.authenticateWithToken)\n\nOnce connected, you'll be able to:\n• Browse your Jira issues\n• Analyze issues with AI\n• Generate code from requirements\n• Create new issues\n• Send issues to Mirai chat",
+				"when": "!mirai-jira:authenticating"
+			},
+			{
+				"view": "mirai-jira-login",
+				"contents": "🔄 Connecting to Jira...\n\nPlease wait while we verify your credentials.\n\n[⚠️ Having issues? Clear token and try again](command:mirai-jira.clearToken)",
+				"when": "mirai-jira:authenticating"
+			},
+			{
+				"view": "mirai-jira-issues",
+				"contents": "No Jira issues found.\n\nMake sure you have access to Jira projects, or try refreshing.\n\n[🔄 Refresh Issues](command:mirai-jira.refreshIssues)",
+				"when": "mirai-jira:authenticated && mirai-jira:noIssues"
+			}
+		],
+		"uriHandlers": [
+			{
+				"scheme": "mirai"
+			}
+		],
+		"configuration": {
+			"title": "Mirai Jira",
+			"properties": {
+				"mirai-jira.apiToken": {
+					"type": "string",
+					"default": "",
+					"description": "Your Jira API token. Generate at https://id.atlassian.com/manage-profile/security/api-tokens",
+					"scope": "application"
+				},
+				"mirai-jira.baseUrl": {
+					"type": "string",
+					"default": "",
+					"description": "Your Jira instance URL (e.g., https://yourcompany.atlassian.net)",
+					"scope": "application"
+				},
+				"mirai-jira.email": {
+					"type": "string",
+					"default": "",
+					"description": "Your Jira account email address",
+					"scope": "application"
+				},
+				"mirai-jira.defaultProject": {
+					"type": "string",
+					"default": "",
+					"description": "Default project key for creating issues",
+					"scope": "application"
+				},
+				"mirai-jira.autoRefresh": {
+					"type": "boolean",
+					"default": true,
+					"description": "Automatically refresh issues on startup"
+				},
+				"mirai-jira.maxIssues": {
+					"type": "number",
+					"default": 50,
+					"description": "Maximum number of issues to fetch",
+					"scope": "window"
+				},
+				"mirai-jira.oauthAccessToken": {
+					"type": "string",
+					"default": "",
+					"description": "OAuth access token (managed automatically)",
+					"scope": "application"
+				},
+				"mirai-jira.oauthRefreshToken": {
+					"type": "string",
+					"default": "",
+					"description": "OAuth refresh token (managed automatically)",
+					"scope": "application"
+				},
+				"mirai-jira.cloudId": {
+					"type": "string",
+					"default": "",
+					"description": "Jira Cloud ID (managed automatically)",
+					"scope": "application"
+				},
+				"mirai-jira.siteUrl": {
+					"type": "string",
+					"default": "",
+					"description": "Jira site URL (managed automatically)",
+					"scope": "application"
+				},
+				"mirai-jira.siteName": {
+					"type": "string",
+					"default": "",
+					"description": "Jira site name (managed automatically)",
+					"scope": "application"
+				},
+				"mirai-jira.viewMode": {
+					"type": "string",
+					"enum": [
+						"byProjectHierarchy",
+						"bySprint",
+						"byStatus"
+					],
+					"default": "byProjectHierarchy",
+					"description": "How to organize issues in the tree view",
+					"scope": "window"
+				},
+				"mirai-jira.githubToken": {
+					"type": "string",
+					"default": "",
+					"description": "GitHub Personal Access Token for PR integration",
+					"scope": "application"
+				}
+			}
+		},
+		"menus": {
+			"view/title": [
+				{
+					"command": "mirai-jira.refreshIssues",
+					"when": "view == mirai-jira-issues",
+					"group": "navigation"
+				},
+				{
+					"command": "mirai-jira.createIssue",
+					"when": "view == mirai-jira-issues",
+					"group": "navigation"
+				},
+				{
+					"command": "mirai-jira.toggleViewMode",
+					"when": "view == mirai-jira-issues",
+					"group": "navigation"
+				},
+				{
+					"command": "mirai-jira.filterAssignedToMe",
+					"when": "view == mirai-jira-issues",
+					"group": "1_filters"
+				},
+				{
+					"command": "mirai-jira.filterRecentlyUpdated",
+					"when": "view == mirai-jira-issues",
+					"group": "1_filters"
+				},
+				{
+					"command": "mirai-jira.filterBugsOnly",
+					"when": "view == mirai-jira-issues",
+					"group": "1_filters"
+				},
+				{
+					"command": "mirai-jira.clearFilters",
+					"when": "view == mirai-jira-issues",
+					"group": "1_filters"
+				}
+			],
+			"commandPalette": [
+				{
+					"command": "mirai-jira.openJiraPanel",
+					"when": "true"
+				},
+				{
+					"command": "mirai-jira.authenticateWithToken",
+					"when": "true"
+				},
+				{
+					"command": "mirai-jira.authenticateWithOAuth",
+					"when": "true"
+				},
+				{
+					"command": "mirai-jira.clearToken",
+					"when": "true"
+				},
+				{
+					"command": "mirai-jira.analyzeIssueWithChat",
+					"when": "true"
+				},
+				{
+					"command": "mirai-jira.generateCodeFromIssue",
+					"when": "true"
+				},
+				{
+					"command": "mirai-jira.sendIssueToChat",
+					"when": "true"
+				},
+				{
+					"command": "mirai-jira.createIssue",
+					"when": "true"
+				},
+				{
+					"command": "mirai-jira.refreshIssues",
+					"when": "true"
+				}
+			],
+			"view/item/context": [
+				{
+					"command": "mirai-jira.analyzeSpecificSprint",
+					"when": "view == mirai-jira-issues && viewItem == sprint",
+					"group": "ai@1"
+				},
+				{
+					"command": "mirai-jira.discussIssueWithAI",
+					"when": "view == mirai-jira-issues && viewItem == issue",
+					"group": "ai@1"
+				},
+				{
+					"command": "mirai-jira.estimateComplexity",
+					"when": "view == mirai-jira-issues && viewItem == issue",
+					"group": "ai@2"
+				}
+			]
+		}
+	},
+	"scripts": {
+		"vscode:prepublish": "npm run compile",
+		"compile": "tsc -p ./",
+		"watch": "tsc -watch -p ./"
+	},
+	"devDependencies": {
+		"@types/node": "16.x",
+		"@types/vscode": "^1.74.0",
+		"typescript": "^4.9.4"
+	},
+	"dependencies": {
+		"@vscode/codicons": "^0.0.40",
+		"axios": "^1.6.0"
+	}
+}

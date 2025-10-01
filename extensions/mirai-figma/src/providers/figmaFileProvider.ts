@@ -1,0 +1,158 @@
+import * as vscode from 'vscode';
+import { FigmaApiService, FigmaFile } from '../services/figmaApiService';
+
+export class FigmaFileItem extends vscode.TreeItem {
+	constructor(
+		public readonly file: FigmaFile,
+		public readonly collapsibleState: vscode.TreeItemCollapsibleState
+	) {
+		super(file.name, collapsibleState);
+
+		this.tooltip = `${file.name} - Last modified: ${new Date(file.last_modified).toLocaleDateString()}`;
+		this.description = new Date(file.last_modified).toLocaleDateString();
+		this.contextValue = 'figmaFile';
+
+		// Set icon
+		this.iconPath = new vscode.ThemeIcon('file-media');
+
+		// Set command to open file details
+		this.command = {
+			command: 'mirai-figma.openFileDetails',
+			title: 'Open File Details',
+			arguments: [file]
+		};
+	}
+}
+
+export class FigmaFileProvider implements vscode.TreeDataProvider<FigmaFileItem> {
+	private _onDidChangeTreeData: vscode.EventEmitter<FigmaFileItem | undefined | null | void> = new vscode.EventEmitter<FigmaFileItem | undefined | null | void>();
+	readonly onDidChangeTreeData: vscode.Event<FigmaFileItem | undefined | null | void> = this._onDidChangeTreeData.event;
+
+	private files: FigmaFile[] = [];
+
+	constructor(private figmaApi: FigmaApiService) {
+		// Register the file details command
+		vscode.commands.registerCommand('mirai-figma.openFileDetails', (file: FigmaFile) => {
+			this.openFileDetails(file);
+		});
+	}
+
+	refresh(): void {
+		this.loadFiles();
+	}
+
+	getTreeItem(element: FigmaFileItem): vscode.TreeItem {
+		return element;
+	}
+
+	getChildren(element?: FigmaFileItem): Thenable<FigmaFileItem[]> {
+		if (!this.figmaApi.isConfigured()) {
+			vscode.window.showWarningMessage('Figma access token not configured. Please set it in settings.');
+			return Promise.resolve([]);
+		}
+
+		if (!element) {
+			// Return root items (recent files)
+			return Promise.resolve(
+				this.files.map(file => new FigmaFileItem(file, vscode.TreeItemCollapsibleState.None))
+			);
+		}
+
+		return Promise.resolve([]);
+	}
+
+	private async loadFiles() {
+		try {
+			// Use the new proper API method that gets files from teams/projects
+			const recentFiles = await this.figmaApi.getRecentFilesProper();
+
+			// Convert FigmaFileInfo to FigmaFile format for compatibility
+			this.files = recentFiles.map(fileInfo => ({
+				key: fileInfo.key,
+				name: fileInfo.name,
+				thumbnail_url: fileInfo.thumbnail_url,
+				last_modified: fileInfo.last_modified,
+				// Add extra context as custom properties
+				projectName: (fileInfo as any).projectName,
+				teamName: (fileInfo as any).teamName,
+				created_at: fileInfo.created_at
+			}));
+
+			this._onDidChangeTreeData.fire();
+
+			// Update context for showing/hiding views
+			vscode.commands.executeCommand('setContext', 'mirai-figma:noFiles', this.files.length === 0);
+
+		} catch (error) {
+			console.error('Error loading Figma files:', error);
+			vscode.window.showErrorMessage(`Failed to load Figma files: ${error}`);
+
+			// Set no files context on error
+			vscode.commands.executeCommand('setContext', 'mirai-figma:noFiles', true);
+		}
+	}
+
+	private async openFileDetails(file: FigmaFile) {
+		try {
+			// Create a new document with file details
+			const content = this.generateFileDetailsContent(file);
+			const document = await vscode.workspace.openTextDocument({
+				content,
+				language: 'markdown'
+			});
+			await vscode.window.showTextDocument(document);
+		} catch (error) {
+			vscode.window.showErrorMessage(`Failed to open file details: ${error}`);
+		}
+	}
+
+	private generateFileDetailsContent(file: FigmaFile): string {
+		const fileWithContext = file as any; // Cast to access additional properties
+
+		return `# ${file.name}
+
+## File Information
+- **File Key**: \`${file.key}\`
+- **Last Modified**: ${new Date(file.last_modified).toLocaleString()} (${this.getRelativeTime(file.last_modified)} ago)
+${fileWithContext.created_at ? `- **Created**: ${new Date(fileWithContext.created_at).toLocaleString()}` : ''}
+${fileWithContext.teamName ? `- **Team**: ${fileWithContext.teamName}` : ''}
+${fileWithContext.projectName ? `- **Project**: ${fileWithContext.projectName}` : ''}
+- **Thumbnail**: ![Thumbnail](${file.thumbnail_url})
+
+## Quick Actions
+- [Open in Figma](https://www.figma.com/file/${file.key})
+- [Import Design Tokens](command:mirai-figma.importDesignTokens?${encodeURIComponent(JSON.stringify([file.key]))})
+- [Generate Code](command:mirai-figma.generateCode?${encodeURIComponent(JSON.stringify([file.key]))})
+- [Send to AI Chat](command:mirai-figma.sendDesignToChat?${encodeURIComponent(JSON.stringify([file.key]))})
+
+## Usage
+You can use this file key (\`${file.key}\`) with the following commands:
+- **Import Design Tokens**: Extract colors, typography, spacing, and other design tokens
+- **Generate Code**: Convert Figma designs to React, Vue, Angular, or HTML components
+- **AI Analysis**: Send design to Mirai chat for AI-powered insights and code generation
+- **View in Browser**: Open the file directly in Figma
+
+---
+*Generated by Mirai Figma Extension*
+`;
+	}
+
+	private getRelativeTime(dateString: string): string {
+		const date = new Date(dateString);
+		const now = new Date();
+		const diffMs = now.getTime() - date.getTime();
+
+		const diffMinutes = Math.floor(diffMs / (1000 * 60));
+		const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+		const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+		if (diffMinutes < 60) {
+			return `${diffMinutes} minute${diffMinutes !== 1 ? 's' : ''}`;
+		} else if (diffHours < 24) {
+			return `${diffHours} hour${diffHours !== 1 ? 's' : ''}`;
+		} else {
+			return `${diffDays} day${diffDays !== 1 ? 's' : ''}`;
+		}
+	}
+}
+

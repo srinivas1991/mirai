@@ -11,6 +11,7 @@ import { registerSingleton, InstantiationType } from '../../../../platform/insta
 import { createDecorator } from '../../../../platform/instantiation/common/instantiation.js';
 import { IStorageService, StorageScope, StorageTarget } from '../../../../platform/storage/common/storage.js';
 import { IMetricsService } from './metricsService.js';
+import { IProductionConfigService } from './productionConfig.js';
 import { defaultProviderSettings, getModelCapabilities, ModelOverrides } from './modelCapabilities.js';
 import { VOID_SETTINGS_STORAGE_KEY } from './storageKeys.js';
 import { defaultSettingsOfProvider, FeatureName, ProviderName, ModelSelectionOfFeature, SettingsOfProvider, SettingName, providerNames, ModelSelection, modelSelectionsEqual, featureNames, VoidStatefulModelInfo, GlobalSettings, GlobalSettingName, defaultGlobalSettings, ModelSelectionOptions, OptionsOfModelSelection, ChatMode, OverridesOfModel, defaultOverridesOfModel, MCPUserStateOfName as MCPUserStateOfName, MCPUserState } from './voidSettingsTypes.js';
@@ -79,6 +80,10 @@ export interface IVoidSettingsService {
 	addMCPUserStateOfNames(userStateOfName: MCPUserStateOfName): Promise<void>;
 	removeMCPUserStateOfNames(serverNames: string[]): Promise<void>;
 	setMCPServerState(serverName: string, state: MCPUserState): Promise<void>;
+
+	// Production mode properties
+	readonly isProduction: boolean;
+	readonly productionFeatures: import('./productionConfig.js').IProductionFeatures;
 }
 
 
@@ -241,6 +246,7 @@ class VoidSettingsService extends Disposable implements IVoidSettingsService {
 		@IStorageService private readonly _storageService: IStorageService,
 		@IEncryptionService private readonly _encryptionService: IEncryptionService,
 		@IMetricsService private readonly _metricsService: IMetricsService,
+		@IProductionConfigService private readonly _productionConfigService: IProductionConfigService,
 		// could have used this, but it's clearer the way it is (+ slightly different eg StorageTarget.USER)
 		// @ISecretStorageService private readonly _secretStorageService: ISecretStorageService,
 	) {
@@ -266,6 +272,10 @@ class VoidSettingsService extends Disposable implements IVoidSettingsService {
 		this._onUpdate_syncSCMToChat()
 	}
 	async resetState() {
+		if (!this._productionConfigService.canAccess('allowSettingsModification')) {
+			this.logProductionRestriction('resetState', 'all');
+			return;
+		}
 		await this.dangerousSetState(defaultState())
 	}
 
@@ -289,7 +299,7 @@ class VoidSettingsService extends Disposable implements IVoidSettingsService {
 			}
 			// add disableSystemMessage feature
 			if (readS.globalSettings.disableSystemMessage === undefined) readS.globalSettings.disableSystemMessage = false;
-			
+
 			// add autoAcceptLLMChanges feature
 			if (readS.globalSettings.autoAcceptLLMChanges === undefined) readS.globalSettings.autoAcceptLLMChanges = false;
 		}
@@ -365,7 +375,48 @@ class VoidSettingsService extends Disposable implements IVoidSettingsService {
 		this._storageService.store(VOID_SETTINGS_STORAGE_KEY, encryptedState, StorageScope.APPLICATION, StorageTarget.USER);
 	}
 
+	// Production mode checks
+	private canModifySetting(settingKey: string): boolean {
+		if (!this._productionConfigService.isProduction) {
+			return true;
+		}
+
+		// Block API key modifications in production
+		if (settingKey.includes('apiKey')) {
+			return this._productionConfigService.canAccess('allowLLMKeyConfiguration');
+		}
+
+		// Block provider configurations
+		if (settingKey.includes('provider') || settingKey.includes('endpoint')) {
+			return this._productionConfigService.canAccess('allowProviderConfiguration');
+		}
+
+		// Block model configurations
+		if (settingKey.includes('models')) {
+			return this._productionConfigService.canAccess('allowModelConfiguration');
+		}
+
+		return this._productionConfigService.canAccess('allowSettingsModification');
+	}
+
+	private logProductionRestriction(action: string, settingKey: string): void {
+		console.warn(`[Production Mode] ${action} blocked for setting: ${settingKey}`);
+	}
+
+	get isProduction(): boolean {
+		return this._productionConfigService.isProduction;
+	}
+
+	get productionFeatures() {
+		return this._productionConfigService.features;
+	}
+
 	setSettingOfProvider: SetSettingOfProviderFn = async (providerName, settingName, newVal) => {
+		const settingKey = `${providerName}.${settingName}`;
+		if (!this.canModifySetting(settingKey)) {
+			this.logProductionRestriction('setSettingOfProvider', settingKey);
+			return;
+		}
 
 		const newModelSelectionOfFeature = this.state.modelSelectionOfFeature
 
@@ -410,6 +461,11 @@ class VoidSettingsService extends Disposable implements IVoidSettingsService {
 	}
 
 	setGlobalSetting: SetGlobalSettingFn = async (settingName, newVal) => {
+		const settingKey = `global.${settingName}`;
+		if (!this.canModifySetting(settingKey)) {
+			this.logProductionRestriction('setGlobalSetting', settingKey);
+			return;
+		}
 		const newState: VoidSettingsState = {
 			...this.state,
 			globalSettings: {
@@ -429,6 +485,11 @@ class VoidSettingsService extends Disposable implements IVoidSettingsService {
 
 
 	setModelSelectionOfFeature: SetModelSelectionOfFeatureFn = async (featureName, newVal) => {
+		const settingKey = `modelSelection.${featureName}`;
+		if (!this.canModifySetting(settingKey)) {
+			this.logProductionRestriction('setModelSelectionOfFeature', settingKey);
+			return;
+		}
 		const newState: VoidSettingsState = {
 			...this.state,
 			modelSelectionOfFeature: {

@@ -795,17 +795,20 @@ export class AutocompleteService extends Disposable implements IAutocompleteServ
 		const modelSelectionOptions = modelSelection ? this._settingsService.state.optionsOfModelSelection[featureName][modelSelection.providerName]?.[modelSelection.modelName] : undefined
 
 		// set parameters of `newAutocompletion` appropriately
-		newAutocompletion.llmPromise = new Promise((resolve, reject) => {
+		newAutocompletion.llmPromise = new Promise(async (resolve, reject) => {
+
+			// Prepare FIM message with enhanced context
+			const fimMessages = await this._convertToLLMMessageService.prepareFIMMessage({
+				messages: {
+					prefix: llmPrefix,
+					suffix: llmSuffix,
+					stopTokens: stopTokens,
+				}
+			})
 
 			const requestId = this._llmMessageService.sendLLMMessage({
 				messagesType: 'FIMMessage',
-				messages: this._convertToLLMMessageService.prepareFIMMessage({
-					messages: {
-						prefix: llmPrefix,
-						suffix: llmSuffix,
-						stopTokens: stopTokens,
-					}
-				}),
+				messages: fimMessages,
 				modelSelection,
 				modelSelectionOptions,
 				overridesOfModel,

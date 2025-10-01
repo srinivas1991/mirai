@@ -41,14 +41,15 @@ function code() {
 	export VSCODE_CLI=1
 	export ELECTRON_ENABLE_STACK_DUMPING=1
 	export ELECTRON_ENABLE_LOGGING=1
+	export NODE_OPTIONS="--force-node-api-uncaught-exceptions-policy=true ${NODE_OPTIONS:-}"
 
 	DISABLE_TEST_EXTENSION="--disable-extension=vscode.vscode-api-tests"
 	if [[ "$@" == *"--extensionTestsPath"* ]]; then
 		DISABLE_TEST_EXTENSION=""
 	fi
 
-	# Launch Code
-	exec "$CODE" . $DISABLE_TEST_EXTENSION "$@"
+	# Launch Code with keychain disabled by default
+	exec "$CODE" . $DISABLE_TEST_EXTENSION --use-inmemory-secretstorage --password-store=basic "$@"
 }
 
 function code-wsl()

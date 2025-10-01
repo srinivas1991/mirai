@@ -8,29 +8,38 @@
 @tailwind utilities;
 
 & {
+	/* VS Code native sidebar styling */
+	--mirai-primary: var(--vscode-sideBar-background);
+	--mirai-primary-light: var(--vscode-sideBar-border);
+	--mirai-primary-dark: var(--vscode-sideBar-background);
+	--mirai-secondary: var(--vscode-sideBar-background);
+	--mirai-accent: var(--vscode-focusBorder);
+	--mirai-surface: var(--vscode-sideBar-background);
+	--mirai-surface-light: var(--vscode-list-hoverBackground);
+	--mirai-surface-dark: var(--vscode-sideBar-background);
+
 	--void-bg-1: var(--vscode-input-background);
-	--void-bg-1-alt: var(--vscode-badge-background);
+	--void-bg-1-alt: var(--vscode-list-hoverBackground);
 	--void-bg-2: var(--vscode-sideBar-background);
-	--void-bg-2-alt: color-mix(in srgb, var(--vscode-editor-background) 30%, var(--vscode-sideBar-background) 70%);
-	--void-bg-2-hover: color-mix(in srgb, var(--vscode-editor-foreground) 2%, var(--vscode-sideBar-background) 98%);
+	--void-bg-2-alt: var(--vscode-list-activeSelectionBackground);
+	--void-bg-2-hover: var(--vscode-list-hoverBackground);
 	--void-bg-3: var(--vscode-editor-background);
 
-	--void-fg-0: color-mix(in srgb, var(--vscode-tab-activeForeground) 90%, black 10%);
-	--void-fg-1: var(--vscode-editor-foreground);
+	--void-fg-0: var(--vscode-sideBar-foreground);
+	--void-fg-1: var(--vscode-sideBar-foreground);
 	--void-fg-2: var(--vscode-input-foreground);
 	--void-fg-3: var(--vscode-input-placeholderForeground);
-	/* --void-fg-4: var(--vscode-tab-inactiveForeground); */
 	--void-fg-4: var(--vscode-list-deemphasizedForeground);
 
 	--void-warning: var(--vscode-charts-yellow);
 
-	--void-border-1: var(--vscode-commandCenter-activeBorder);
-	--void-border-2: var(--vscode-commandCenter-border);
-	--void-border-3: var(--vscode-commandCenter-inactiveBorder);
+	--void-border-1: var(--vscode-focusBorder);
+	--void-border-2: var(--vscode-input-border);
+	--void-border-3: var(--vscode-sideBar-border);
 	--void-border-4: var(--vscode-editorGroup-border);
 
-	--void-ring-color: #007FD4;
-	--void-link-color: #007FD4;
+	--void-ring-color: var(--vscode-focusBorder);
+	--void-link-color: var(--vscode-textLink-foreground);
 }
 
 .select-child-restyle select {

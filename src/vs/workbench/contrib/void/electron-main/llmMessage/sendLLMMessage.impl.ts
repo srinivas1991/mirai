@@ -42,6 +42,8 @@ type InternalCommonMessageParams = {
 	overridesOfModel: OverridesOfModel | undefined;
 	modelName: string;
 	_setAborter: (aborter: () => void) => void;
+	reportTokenUsage: (usage: any, requestType: 'chat' | 'completion' | 'fim') => Promise<void>;
+	miraiToken: string | null; // 🔐 Mirai Auth access token
 }
 
 type SendChatParams_Internal = InternalCommonMessageParams & {
@@ -267,10 +269,316 @@ const rawToolCallObjOfAnthropicParams = (toolBlock: Anthropic.Messages.ToolUseBl
 }
 
 
+// ------------ BACKEND PROXY (SIMPLIFIED) ------------
+
+// Helper function to determine the actual provider from model name
+const determineProviderFromModel = (modelName: string): string => {
+	const lowerModelName = modelName.toLowerCase()
+
+	// Anthropic models
+	if (lowerModelName.includes('claude')) {
+		return 'anthropic'
+	}
+
+	// OpenAI models
+	if (lowerModelName.includes('gpt') || lowerModelName.includes('o1') || lowerModelName.includes('davinci') || lowerModelName.includes('curie') || lowerModelName.includes('babbage') || lowerModelName.includes('ada')) {
+		return 'openAI'
+	}
+
+	// Gemini models
+	if (lowerModelName.includes('gemini') || lowerModelName.includes('bison') || lowerModelName.includes('gecko')) {
+		return 'gemini'
+	}
+
+	// Mistral models
+	if (lowerModelName.includes('mistral') || lowerModelName.includes('codestral') || lowerModelName.includes('mixtral')) {
+		return 'mistral'
+	}
+
+	// Groq models (often use model names from other providers)
+	if (lowerModelName.includes('llama') || lowerModelName.includes('mixtral-8x7b')) {
+		return 'groq'
+	}
+
+	// xAI models
+	if (lowerModelName.includes('grok')) {
+		return 'xAI'
+	}
+
+	// DeepSeek models
+	if (lowerModelName.includes('deepseek')) {
+		return 'deepseek'
+	}
+
+	// Default to OpenAI for unknown models
+	return 'openAI'
+}
+
+
+const _sendBackendProxyChat = async ({ messages, onText, onFinalMessage, onError, settingsOfProvider, modelSelectionOptions, modelName: modelName_, _setAborter, providerName, chatMode, separateSystemMessage, overridesOfModel, mcpTools, reportTokenUsage, miraiToken }: SendChatParams_Internal) => {
+	// Note: reportTokenUsage is not used - backend proxy tracks token usage itself
+	const thisConfig = settingsOfProvider.backendProxy
+	const endpoint = thisConfig.endpoint || 'http://localhost:3002'
+
+	// Determine actual provider when using backendProxy
+	const actualProviderName = providerName === 'backendProxy'
+		? determineProviderFromModel(modelName_)
+		: providerName
+
+	// Get model capabilities for tool format detection based on actual provider
+	const { specialToolFormat, additionalOpenAIPayload } = getModelCapabilities(actualProviderName as ProviderName, modelName_, overridesOfModel)
+
+	// Prepare tools based on the actual target provider's format
+	let toolsArray: any = undefined
+	if (specialToolFormat === 'openai-style') {
+		const potentialTools = openAITools(chatMode, mcpTools)
+		toolsArray = potentialTools
+	} else if (specialToolFormat === 'anthropic-style') {
+		const potentialTools = anthropicTools(chatMode, mcpTools)
+		toolsArray = potentialTools
+	} else if (specialToolFormat === 'gemini-style') {
+		const potentialTools = geminiTools(chatMode, mcpTools)
+		toolsArray = potentialTools
+	}
+
+	// Simple request payload - backend proxy handles all provider mapping
+	const requestPayload = {
+		messages: messages,  // Send original messages array
+		separateSystemMessage: separateSystemMessage,  // Send system message separately
+		providerName: actualProviderName,  // Send actual provider name (not "backendProxy")
+		modelName: modelName_,       // Send original model name
+		temperature: 0.7,
+		max_tokens: 4000,
+		stream: true,
+		tools: toolsArray,
+		chatMode: chatMode,
+		mcpTools: mcpTools,
+		additionalOpenAIPayload: additionalOpenAIPayload,
+		modelSelectionOptions: modelSelectionOptions,  // ✅ ADDED: For reasoning settings
+		overridesOfModel: overridesOfModel,  // ✅ ADDED: For custom model configuration
+	}
+
+
+
+	let fullTextSoFar = ''
+	let fullReasoningSoFar = ''
+	let toolCall: any = null  // Store the complete tool call
+	let toolCallInProgress: any = {}  // Track tool call as it's being built
+	let abortController: AbortController | null = null
+
+	// Handle tool extraction if not using native tools
+	if (!specialToolFormat) {
+		const { newOnText, newOnFinalMessage } = extractXMLToolsWrapper(onText, onFinalMessage, chatMode, mcpTools)
+		onText = newOnText
+		onFinalMessage = newOnFinalMessage
+	}
+
+	try {
+		abortController = new AbortController()
+		_setAborter(() => abortController?.abort())
+
+		const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+
+		// 🔐 Prioritize Mirai Auth token, fallback to API key
+		const authToken = miraiToken || thisConfig.apiKey;
+		if (authToken) {
+			headers['Authorization'] = `Bearer ${authToken}`
+		}
+
+		const response = await fetch(`${endpoint}/v1/chat/completions`, {
+			method: 'POST',
+			headers: headers,
+			body: JSON.stringify(requestPayload),
+			signal: abortController.signal,
+		})
+
+		if (!response.ok) {
+			const errorText = await response.text()
+			throw new Error(`Backend proxy request failed: ${response.status} ${errorText}`)
+		}
+
+		if (!response.body) {
+			throw new Error('No response body received from backend proxy')
+		}
+		const reader = response.body.getReader()
+		const decoder = new TextDecoder()
+		let chunkCount = 0;
+
+		while (true) {
+			const { done, value } = await reader.read()
+			if (done) break;
+
+			chunkCount++;
+			const chunk = decoder.decode(value, { stream: true })
+			const lines = chunk.split('\n')
+
+			for (const line of lines) {
+				if (line.startsWith('data: ')) {
+					const dataStr = line.slice(6).trim()
+					if (dataStr === '[DONE]') break;
+
+					try {
+						const data = JSON.parse(dataStr)
+
+						if (data.error) {
+							onError({ message: `Backend proxy error: ${data.error}`, fullError: new Error(data.error) })
+							return
+						}
+
+						// Handle OpenAI-style streaming format (choices[0].delta.content)
+						const delta = data.choices?.[0]?.delta;
+						if (delta) {
+							// Handle content from delta
+							if (delta.content) {
+								fullTextSoFar += delta.content
+							}
+
+							// Handle tool calls from delta - build complete tool call
+							if (delta.tool_calls) {
+								for (const tool of delta.tool_calls) {
+									// Initialize or update tool call (replace if different ID)
+									if (tool.id && (!toolCallInProgress.id || toolCallInProgress.id !== tool.id)) {
+										toolCallInProgress = {
+											id: tool.id,
+											function: {
+												name: tool.function?.name || '',
+												arguments: tool.function?.arguments || ''
+											}
+										};
+									}
+
+									// Update function name if provided and same ID
+									if (tool.id === toolCallInProgress.id && tool.function?.name && toolCallInProgress.function) {
+										toolCallInProgress.function.name = tool.function.name;
+									}
+
+									// Update arguments if provided and same ID
+									if (tool.id === toolCallInProgress.id && tool.function?.arguments && toolCallInProgress.function) {
+										toolCallInProgress.function.arguments = tool.function.arguments;
+									}
+								}
+							}
+						}
+
+						// Also handle direct content/reasoning format (backward compatibility)
+						if (data.content) {
+							fullTextSoFar += data.content
+						}
+
+						// Handle reasoning
+						if (data.reasoning) {
+							fullReasoningSoFar += data.reasoning
+						}
+
+						onText({
+							fullText: fullTextSoFar,
+							fullReasoning: fullReasoningSoFar,
+							toolCall: undefined, // Don't try to construct tool call from streaming data
+						})
+					} catch (parseError) {
+						// Ignore parsing errors for malformed chunks
+					}
+				}
+			}
+		}
+
+		// Report token usage
+		const estimatedUsage = {
+			promptTokens: Math.ceil(JSON.stringify(messages).length / 4),
+			completionTokens: Math.ceil(fullTextSoFar.length / 4),
+			totalTokens: Math.ceil((JSON.stringify(messages).length + fullTextSoFar.length) / 4),
+			providerId: 'backendProxy',
+			modelId: modelName_,
+			requestType: 'chat' as const,
+			timestamp: new Date().toISOString(),
+		}
+		reportTokenUsage(estimatedUsage, 'chat')
+
+		// Process final tool call if any
+		if (toolCallInProgress.id && toolCallInProgress.function?.name) {
+			const toolParamsStr = toolCallInProgress.function.arguments || '{}';
+			toolCall = rawToolCallObjOfParamsStr(toolCallInProgress.function.name, toolParamsStr, toolCallInProgress.id);
+		}
+
+		const toolCallObj = toolCall ? { toolCall } : {}
+
+		onFinalMessage({
+			fullText: fullTextSoFar,
+			fullReasoning: fullReasoningSoFar,
+			anthropicReasoning: null,
+			...toolCallObj
+		})
+
+	} catch (error) {
+		if (error.name === 'AbortError') return
+		onError({ message: `Backend proxy error: ${error.message}`, fullError: error })
+	}
+}
+
+// Simplified FIM implementation - Backend proxy handles all model selection and mapping
+const _sendBackendProxyFIM = async (params: SendFIMParams_Internal) => {
+	const { messages: { prefix, suffix, stopTokens }, onFinalMessage, onError, settingsOfProvider, _setAborter, providerName, modelName: modelName_, miraiToken } = params
+
+	const thisConfig = settingsOfProvider.backendProxy
+	const endpoint = thisConfig.endpoint || 'http://localhost:3002'
+
+	// Simple request payload - backend proxy handles ALL provider and model mapping
+	const requestPayload = {
+		prefix: prefix,
+		suffix: suffix,
+		stopTokens: stopTokens,
+		max_tokens: 300,
+		temperature: 0.7,
+		providerName: providerName,  // Send "backendProxy" as-is
+		modelName: modelName_        // Send original model name (e.g. "gpt-4o")
+	}
+
+
+	let abortController: AbortController | null = null
+
+	try {
+		abortController = new AbortController()
+		_setAborter(() => abortController?.abort())
+
+		const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+
+		// 🔐 Prioritize Mirai Auth token, fallback to API key
+		const authToken = miraiToken || thisConfig.apiKey;
+		if (authToken) {
+			headers['Authorization'] = `Bearer ${authToken}`
+		}
+
+		const response = await fetch(`${endpoint}/v1/fim/completions`, {
+			method: 'POST',
+			headers: headers,
+			body: JSON.stringify(requestPayload),
+			signal: abortController.signal,
+		})
+
+		if (!response.ok) {
+			const errorText = await response.text()
+			throw new Error(`Backend proxy FIM request failed: ${response.status} ${errorText}`)
+		}
+
+		const responseData = await response.json()
+		const fullText = responseData.choices[0]?.text || ''
+
+		onFinalMessage({
+			fullText: fullText,
+			fullReasoning: '',
+			anthropicReasoning: null
+		})
+
+	} catch (error) {
+		if (error.name === 'AbortError') return
+		onError({ message: `Backend proxy FIM error: ${error.message}`, fullError: error })
+	}
+}
+
 // ------------ OPENAI-COMPATIBLE ------------
 
 
-const _sendOpenAICompatibleChat = async ({ messages, onText, onFinalMessage, onError, settingsOfProvider, modelSelectionOptions, modelName: modelName_, _setAborter, providerName, chatMode, separateSystemMessage, overridesOfModel, mcpTools }: SendChatParams_Internal) => {
+const _sendOpenAICompatibleChat = async ({ messages, onText, onFinalMessage, onError, settingsOfProvider, modelSelectionOptions, modelName: modelName_, _setAborter, providerName, chatMode, separateSystemMessage, overridesOfModel, mcpTools, reportTokenUsage }: SendChatParams_Internal) => {
 	const {
 		modelName,
 		specialToolFormat,
@@ -337,8 +645,12 @@ const _sendOpenAICompatibleChat = async ({ messages, onText, onFinalMessage, onE
 		.create(options)
 		.then(async response => {
 			_setAborter(() => response.controller.abort())
+			let lastChunk: any = null;
+
 			// when receive text
 			for await (const chunk of response) {
+				lastChunk = chunk; // Keep track of the last chunk for usage data
+
 				// message
 				const newText = chunk.choices[0]?.delta?.content ?? ''
 				fullTextSoFar += newText
@@ -370,6 +682,16 @@ const _sendOpenAICompatibleChat = async ({ messages, onText, onFinalMessage, onE
 				})
 
 			}
+
+			// Report token usage if available in the last chunk
+			console.log('🔍 OpenAI stream completed:', { hasUsage: !!lastChunk?.usage, lastChunk });
+			if (lastChunk?.usage) {
+				console.log('📊 OpenAI response usage:', lastChunk.usage);
+				reportTokenUsage(lastChunk.usage, 'chat');
+			} else {
+				console.warn('⚠️ OpenAI response has no usage data');
+			}
+
 			// on final
 			if (!fullTextSoFar && !fullReasoningSoFar && !toolName) {
 				onError({ message: 'Void: Response from model was empty.', fullError: null })
@@ -455,7 +777,7 @@ const anthropicTools = (chatMode: ChatMode | null, mcpTools: InternalToolInfo[] 
 
 
 // ------------ ANTHROPIC ------------
-const sendAnthropicChat = async ({ messages, providerName, onText, onFinalMessage, onError, settingsOfProvider, modelSelectionOptions, overridesOfModel, modelName: modelName_, _setAborter, separateSystemMessage, chatMode, mcpTools }: SendChatParams_Internal) => {
+const sendAnthropicChat = async ({ messages, providerName, onText, onFinalMessage, onError, settingsOfProvider, modelSelectionOptions, overridesOfModel, modelName: modelName_, _setAborter, separateSystemMessage, chatMode, mcpTools, reportTokenUsage }: SendChatParams_Internal) => {
 	const {
 		modelName,
 		specialToolFormat,
@@ -567,6 +889,15 @@ const sendAnthropicChat = async ({ messages, providerName, onText, onFinalMessag
 		// console.log('TOOLS!!!!!!', JSON.stringify(response, null, 2))
 		const toolCall = tools[0] && rawToolCallObjOfAnthropicParams(tools[0])
 		const toolCallObj = toolCall ? { toolCall } : {}
+
+		// Report token usage if available
+		console.log('🔍 Anthropic finalMessage event:', { hasUsage: !!response.usage, response: response });
+		if (response.usage) {
+			console.log('📊 Anthropic response usage:', response.usage);
+			reportTokenUsage(response.usage, 'chat');
+		} else {
+			console.warn('⚠️ Anthropic response has no usage data');
+		}
 
 		onFinalMessage({ fullText, fullReasoning, anthropicReasoning, ...toolCallObj })
 	})
@@ -728,6 +1059,7 @@ const sendGeminiChat = async ({
 	modelSelectionOptions,
 	chatMode,
 	mcpTools,
+	reportTokenUsage,
 }: SendChatParams_Internal) => {
 
 	if (providerName !== 'gemini') throw new Error(`Sending Gemini chat, but provider was ${providerName}`)
@@ -822,6 +1154,16 @@ const sendGeminiChat = async ({
 				if (!toolId) toolId = generateUuid() // ids are empty, but other providers might expect an id
 				const toolCall = rawToolCallObjOfParamsStr(toolName, toolParamsStr, toolId)
 				const toolCallObj = toolCall ? { toolCall } : {}
+
+				// Report token usage for Gemini (estimated based on content length)
+				console.log('📊 Gemini response completed, estimating token usage');
+				const estimatedUsage = {
+					promptTokenCount: Math.ceil(messages.join(' ').length / 4), // rough estimate
+					candidatesTokenCount: Math.ceil(fullTextSoFar.length / 4), // rough estimate
+					totalTokenCount: Math.ceil((messages.join(' ').length + fullTextSoFar.length) / 4)
+				};
+				reportTokenUsage(estimatedUsage, 'chat');
+
 				onFinalMessage({ fullText: fullTextSoFar, fullReasoning: fullReasoningSoFar, anthropicReasoning: null, ...toolCallObj });
 			}
 		})
@@ -935,6 +1277,17 @@ export const sendLLMMessageToProviderImplementation = {
 	awsBedrock: {
 		sendChat: (params) => _sendOpenAICompatibleChat(params),
 		sendFIM: null,
+		list: null,
+	},
+	backendProxy: {
+		sendChat: (params) => {
+			console.log(`🔄 [VS CODE] Provider selected: backendProxy (Chat)`);
+			return _sendBackendProxyChat(params);
+		},
+		sendFIM: (params) => {
+			console.log(`🔄 [VS CODE] Provider selected: backendProxy (FIM)`);
+			return _sendBackendProxyFIM(params);
+		},
 		list: null,
 	},
 

@@ -88,11 +88,13 @@ export class MetricsMainService extends Disposable implements IMetricsService {
 		@IApplicationStorageMainService private readonly _appStorage: IApplicationStorageMainService,
 	) {
 		super()
-		this.client = new PostHog('phc_UanIdujHiLp55BkUTjB1AuBXcasVkdqRwgnwRlWESH2', {
-			host: 'https://us.i.posthog.com',
-		})
+		// DISABLED: PostHog telemetry removed for privacy
+		// this.client = new PostHog('phc_UanIdujHiLp55BkUTjB1AuBXcasVkdqRwgnwRlWESH2', {
+		// 	host: 'https://us.i.posthog.com',
+		// })
+		this.client = null as any; // Disable telemetry completely
 
-		this.initialize() // async
+		// this.initialize() // async - DISABLED
 	}
 
 	async initialize() {
@@ -140,9 +142,10 @@ export class MetricsMainService extends Disposable implements IMetricsService {
 
 
 	capture: IMetricsService['capture'] = (event, params) => {
-		const capture = { distinctId: this.distinctId, event, properties: params } as const
-		// console.log('full capture:', this.distinctId)
-		this.client.capture(capture)
+		// DISABLED: No telemetry data will be sent
+		console.log('[TELEMETRY DISABLED] Would have captured:', event, params);
+		// const capture = { distinctId: this.distinctId, event, properties: params } as const
+		// this.client.capture(capture)
 	}
 
 	setOptOut: IMetricsService['setOptOut'] = (newVal: boolean) => {

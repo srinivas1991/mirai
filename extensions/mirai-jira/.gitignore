@@ -1,0 +1,20 @@
+# Compiled output
+out/
+*.vsix
+
+# OAuth configuration (contains secrets)
+oauth.config.js
+
+# Node modules
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# VSCode
+.vscode/
+
+# Logs
+*.log
+

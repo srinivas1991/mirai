@@ -81,5 +81,8 @@ import '../common/metricsService.js'
 // updates
 import '../common/voidUpdateService.js'
 
+// global auth service (replaces the old complex token usage service)
+import '../common/globalAuthService.js'
+
 // model service
 import '../common/voidModelService.js'

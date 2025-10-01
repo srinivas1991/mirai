@@ -1,0 +1,106 @@
+{
+	"folders": [
+		{
+			"name": "Void Editor",
+			"path": "."
+		},
+		{
+			"name": "Mirai Auth Extension",
+			"path": "./extensions/mirai-auth"
+		},
+		{
+			"name": "Mirai Figma Extension",
+			"path": "./extensions/mirai-figma"
+		},
+		{
+			"name": "Mirai Jira Extension",
+			"path": "./extensions/mirai-jira"
+		}
+	],
+	"launch": {
+		"version": "0.2.0",
+		"configurations": [
+			{
+				"name": "Launch All Mirai Extensions",
+				"type": "extensionHost",
+				"request": "launch",
+				"args": [
+					"--extensionDevelopmentPath=${workspaceFolder}/extensions/mirai-auth",
+					"--extensionDevelopmentPath=${workspaceFolder}/extensions/mirai-figma",
+					"--extensionDevelopmentPath=${workspaceFolder}/extensions/mirai-jira"
+				],
+				"outFiles": [
+					"${workspaceFolder}/extensions/mirai-*/out/**/*.js"
+				],
+				"preLaunchTask": "compile-all-mirai-extensions"
+			},
+			{
+				"name": "Launch Mirai Auth Only",
+				"type": "extensionHost",
+				"request": "launch",
+				"args": [
+					"--extensionDevelopmentPath=${workspaceFolder}/extensions/mirai-auth"
+				],
+				"outFiles": [
+					"${workspaceFolder}/extensions/mirai-auth/out/**/*.js"
+				]
+			}
+		]
+	},
+	"tasks": {
+		"version": "2.0.0",
+		"tasks": [
+			{
+				"label": "compile-all-mirai-extensions",
+				"dependsOrder": "parallel",
+				"dependsOn": [
+					"compile-mirai-auth",
+					"compile-mirai-figma",
+					"compile-mirai-jira"
+				]
+			},
+			{
+				"label": "compile-mirai-auth",
+				"type": "shell",
+				"command": "npm",
+				"args": ["run", "compile"],
+				"options": {
+					"cwd": "${workspaceFolder}/extensions/mirai-auth"
+				},
+				"group": "build",
+				"presentation": {
+					"echo": true,
+					"reveal": "silent",
+					"focus": false,
+					"panel": "shared"
+				}
+			},
+			{
+				"label": "compile-mirai-figma",
+				"type": "shell",
+				"command": "npm",
+				"args": ["run", "compile"],
+				"options": {
+					"cwd": "${workspaceFolder}/extensions/mirai-figma"
+				},
+				"group": "build"
+			},
+			{
+				"label": "compile-mirai-jira",
+				"type": "shell",
+				"command": "npm",
+				"args": ["run", "compile"],
+				"options": {
+					"cwd": "${workspaceFolder}/extensions/mirai-jira"
+				},
+				"group": "build"
+			}
+		]
+	},
+	"settings": {
+		"mirai-auth.serverUrl": "http://localhost:5173",
+		"mirai-figma.serverUrl": "http://localhost:5173",
+		"mirai-jira.serverUrl": "http://localhost:5173"
+	}
+}
+

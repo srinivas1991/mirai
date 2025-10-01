@@ -64,7 +64,7 @@ export const roundRangeToLines = (range: IRange | null | undefined, options: { e
 const VOID_OPEN_SIDEBAR_ACTION_ID = 'void.sidebar.open'
 registerAction2(class extends Action2 {
 	constructor() {
-		super({ id: VOID_OPEN_SIDEBAR_ACTION_ID, title: localize2('voidOpenSidebar', 'Void: Open Sidebar'), f1: true });
+		super({ id: VOID_OPEN_SIDEBAR_ACTION_ID, title: localize2('voidOpenSidebar', 'Mirai: Open Sidebar'), f1: true });
 	}
 	async run(accessor: ServicesAccessor): Promise<void> {
 		const viewsService = accessor.get(IViewsService)
@@ -81,7 +81,7 @@ registerAction2(class extends Action2 {
 		super({
 			id: VOID_CTRL_L_ACTION_ID,
 			f1: true,
-			title: localize2('voidCmdL', 'Void: Add Selection to Chat'),
+			title: localize2('voidCmdL', 'Mirai: Add Selection to Chat'),
 			keybinding: {
 				primary: KeyMod.CtrlCmd | KeyCode.KeyL,
 				weight: KeybindingWeight.VoidExtension
@@ -240,7 +240,7 @@ registerAction2(class extends Action2 {
 	constructor() {
 		super({
 			id: 'void.settingsAction',
-			title: `Void's Settings`,
+			title: `Mirai's Settings`,
 			icon: { id: 'settings-gear' },
 			menu: [{ id: MenuId.ViewTitle, group: 'navigation', when: ContextKeyExpr.equals('view', VOID_VIEW_ID), }]
 		});
@@ -251,7 +251,45 @@ registerAction2(class extends Action2 {
 	}
 })
 
+// Send message to chat command (for extensions)
+const VOID_SEND_CHAT_MESSAGE_ACTION_ID = 'void.sendChatMessage'
+registerAction2(class extends Action2 {
+	constructor() {
+		super({
+			id: VOID_SEND_CHAT_MESSAGE_ACTION_ID,
+			title: 'Send Message to Mirai Chat',
+			f1: false, // Don't show in command palette
+		});
+	}
+	async run(accessor: ServicesAccessor, message: string): Promise<void> {
+		if (!message || typeof message !== 'string') {
+			throw new Error('void.sendChatMessage requires a message string as parameter');
+		}
 
+		// Get services
+		const viewsService = accessor.get(IViewsService)
+		const chatThreadService = accessor.get(IChatThreadService)
+		const commandService = accessor.get(ICommandService)
+
+		// Ensure Mirai sidebar is open
+		const wasAlreadyOpen = viewsService.isViewContainerVisible(VOID_VIEW_CONTAINER_ID)
+		if (!wasAlreadyOpen) {
+			await commandService.executeCommand(VOID_OPEN_SIDEBAR_ACTION_ID)
+		}
+
+		// Get current thread ID
+		const threadId = chatThreadService.state.currentThreadId
+
+		// Send message to chat
+		await chatThreadService.addUserMessageAndStreamResponse({
+			userMessage: message,
+			threadId
+		});
+
+		// Focus the chat
+		await chatThreadService.focusCurrentChat()
+	}
+})
 
 
 // export class TabSwitchListener extends Disposable {

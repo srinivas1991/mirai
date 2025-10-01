@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { safeStorage as safeStorageElectron, app } from 'electron';
-import { isMacintosh, isWindows, isLinux } from '../../../base/common/platform.js';
+import { isMacintosh, isWindows } from '../../../base/common/platform.js';
 import { KnownStorageProvider, IEncryptionMainService, PasswordStoreCLIOption } from '../common/encryptionService.js';
 import { ILogService } from '../../log/common/log.js';
 
@@ -24,56 +24,44 @@ export class EncryptionMainService implements IEncryptionMainService {
 		@ILogService private readonly logService: ILogService
 	) {
 
-		// Void added this as a nice default for linux so you don't need to specify encryption provider
-		if (isLinux && !app.commandLine.getSwitchValue('password-store')) {
-			this.logService.trace('[EncryptionMainService] No password-store switch, defaulting to basic...');
-			app.commandLine.appendSwitch('password-store', PasswordStoreCLIOption.basic);
-		}
-
-		// if this commandLine switch is set, the user has opted in to using basic text encryption
-		if (app.commandLine.getSwitchValue('password-store') === PasswordStoreCLIOption.basic) {
-			this.logService.trace('[EncryptionMainService] setting usePlainTextEncryption to true...');
-			safeStorage.setUsePlainTextEncryption?.(true);
-			this.logService.trace('[EncryptionMainService] set usePlainTextEncryption to true');
-		}
+		// Mirai: Always use basic text encryption to avoid keychain access
+		this.logService.info('[EncryptionMainService] Using BASIC TEXT ENCRYPTION - API keys will be stored in local storage, NOT keychain');
+		app.commandLine.appendSwitch('password-store', PasswordStoreCLIOption.basic);
+		safeStorage.setUsePlainTextEncryption?.(true);
+		this.logService.info('[EncryptionMainService] Successfully enabled basic text encryption - no keychain access needed');
 	}
 
 	async encrypt(value: string): Promise<string> {
 		this.logService.trace('[EncryptionMainService] Encrypting value...');
-		try {
-			const result = JSON.stringify(safeStorage.encryptString(value));
-			this.logService.trace('[EncryptionMainService] Encrypted value.');
-			return result;
-		} catch (e) {
-			this.logService.error(e);
-			throw e;
-		}
+
+		// Mirai: Always use simple base64 encoding - no keychain dependency
+		this.logService.info('[EncryptionMainService] Using simple base64 encoding for development');
+		const encoded = Buffer.from(value, 'utf8').toString('base64');
+		return JSON.stringify({ data: encoded, type: 'base64' });
 	}
 
 	async decrypt(value: string): Promise<string> {
-		let parsedValue: { data: string };
 		try {
-			parsedValue = JSON.parse(value);
+			const parsedValue = JSON.parse(value);
 			if (!parsedValue.data) {
 				throw new Error(`[EncryptionMainService] Invalid encrypted value: ${value}`);
 			}
-			const bufferToDecrypt = Buffer.from(parsedValue.data);
 
-			this.logService.trace('[EncryptionMainService] Decrypting value...');
-			const result = safeStorage.decryptString(bufferToDecrypt);
-			this.logService.trace('[EncryptionMainService] Decrypted value.');
-			return result;
+			// Mirai: Always use base64 decoding - no keychain dependency
+			this.logService.info('[EncryptionMainService] Decrypting base64 encoded value');
+			return Buffer.from(parsedValue.data, 'base64').toString('utf8');
 		} catch (e) {
-			this.logService.error(e);
+			this.logService.error('[EncryptionMainService] Decryption failed:', e);
 			throw e;
 		}
 	}
 
 	isEncryptionAvailable(): Promise<boolean> {
 		this.logService.trace('[EncryptionMainService] Checking if encryption is available...');
-		const result = safeStorage.isEncryptionAvailable();
-		this.logService.trace('[EncryptionMainService] Encryption is available: ', result);
-		return Promise.resolve(result);
+
+		// Mirai: Always return true - base64 encryption is always available
+		this.logService.info('[EncryptionMainService] Using base64 fallback - encryption always available');
+		return Promise.resolve(true);
 	}
 
 	getKeyStorageProvider(): Promise<KnownStorageProvider> {

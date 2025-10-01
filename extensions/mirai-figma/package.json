@@ -1,0 +1,256 @@
+{
+	"name": "mirai-figma",
+	"displayName": "Mirai Figma Integration",
+	"description": "Seamlessly integrate Figma designs into your Mirai workflow",
+	"version": "1.0.0",
+	"publisher": "mirai",
+	"engines": {
+		"vscode": "^1.74.0"
+	},
+	"categories": [
+		"Other",
+		"Visualization"
+	],
+	"keywords": [
+		"figma",
+		"design",
+		"ui",
+		"prototyping",
+		"design-tokens"
+	],
+	"activationEvents": [
+		"onCommand:mirai-figma.openFigmaPanel",
+		"onCommand:mirai-figma.importDesignTokens",
+		"onCommand:mirai-figma.generateCode",
+		"onCommand:mirai-figma.authenticateWithOAuth",
+		"onCommand:mirai-figma.clearToken",
+		"onCommand:mirai-figma.generateCodeWithChat",
+		"onCommand:mirai-figma.analyzeDesignTokensWithChat",
+		"onCommand:mirai-figma.reviewAccessibilityWithChat",
+		"onCommand:mirai-figma.sendDesignToChat",
+		"onView:mirai-figma-panel"
+	],
+	"main": "./out/extension.js",
+	"contributes": {
+		"commands": [
+			{
+				"command": "mirai-figma.openFigmaPanel",
+				"title": "Open Figma Panel",
+				"category": "Mirai Figma",
+				"icon": "$(browser)"
+			},
+			{
+				"command": "mirai-figma.importDesignTokens",
+				"title": "Import Design Tokens",
+				"category": "Mirai Figma",
+				"icon": "$(symbol-color)"
+			},
+			{
+				"command": "mirai-figma.generateCode",
+				"title": "Generate Code from Design",
+				"category": "Mirai Figma",
+				"icon": "$(code)"
+			},
+			{
+				"command": "mirai-figma.refreshFiles",
+				"title": "Refresh Figma Files",
+				"category": "Mirai Figma",
+				"icon": "$(refresh)"
+			},
+			{
+				"command": "mirai-figma.authenticateWithOAuth",
+				"title": "Authenticate with OAuth",
+				"category": "Mirai Figma",
+				"icon": "$(sign-in)"
+			},
+			{
+				"command": "mirai-figma.clearToken",
+				"title": "Clear Saved Token",
+				"category": "Mirai Figma",
+				"icon": "$(trash)"
+			},
+			{
+				"command": "mirai-figma.generateCodeWithChat",
+				"title": "Generate Code with AI Chat",
+				"category": "Mirai Figma",
+				"icon": "$(robot)"
+			},
+			{
+				"command": "mirai-figma.analyzeDesignTokensWithChat",
+				"title": "Analyze Design Tokens with AI",
+				"category": "Mirai Figma",
+				"icon": "$(symbol-color)"
+			},
+			{
+				"command": "mirai-figma.reviewAccessibilityWithChat",
+				"title": "Review Accessibility with AI",
+				"category": "Mirai Figma",
+				"icon": "$(accessibility)"
+			},
+			{
+				"command": "mirai-figma.sendDesignToChat",
+				"title": "Send Design to AI Chat",
+				"category": "Mirai Figma",
+				"icon": "$(comment-discussion)"
+			},
+			{
+				"command": "mirai-figma.refreshFiles",
+				"title": "Refresh Files",
+				"category": "Mirai Figma",
+				"icon": "$(refresh)"
+			},
+			{
+				"command": "mirai-figma.debugApiStructure",
+				"title": "Debug API Structure",
+				"category": "Mirai Figma",
+				"icon": "$(debug)"
+			}
+		],
+		"views": {
+			"mirai-figma": [
+				{
+					"id": "mirai-figma-login",
+					"name": "Connect to Figma",
+					"when": "!mirai-figma:authenticated"
+				},
+				{
+					"id": "mirai-figma-files",
+					"name": "Files",
+					"when": "mirai-figma:authenticated"
+				},
+				{
+					"id": "mirai-figma-inspector",
+					"name": "Design Inspector",
+					"type": "webview",
+					"when": "mirai-figma:authenticated && mirai-figma:hasOpenFile"
+				},
+				{
+					"id": "mirai-figma-ai",
+					"name": "AI Tools",
+					"type": "webview",
+					"when": "mirai-figma:authenticated"
+				}
+			]
+		},
+		"viewsContainers": {
+			"activitybar": [
+				{
+					"id": "mirai-figma",
+					"title": "Figma",
+					"icon": "$(browser)"
+				}
+			]
+		},
+		"viewsWelcome": [
+			{
+				"view": "mirai-figma-login",
+				"contents": "Connect to your Figma account to access design files and use AI-powered analysis.\n\n[🔐 Connect with OAuth](command:mirai-figma.authenticateWithOAuth)\n\nOnce connected, you'll be able to:\n• Browse your Figma files\n• Analyze designs with AI\n• Generate code from components\n• Extract design tokens\n• Send designs to Mirai chat",
+				"when": "!mirai-figma:authenticating"
+			},
+			{
+				"view": "mirai-figma-login",
+				"contents": "🔄 Connecting to Figma...\n\nPlease complete the authentication in your browser.\n\n[⚠️ Having issues? Clear token and try again](command:mirai-figma.clearToken)",
+				"when": "mirai-figma:authenticating"
+			},
+			{
+				"view": "mirai-figma-files",
+				"contents": "No Figma files found.\n\nMake sure you have access to Figma files in your account, or try refreshing.\n\n[🔄 Refresh Files](command:mirai-figma.refreshFiles)",
+				"when": "mirai-figma:authenticated && mirai-figma:noFiles"
+			}
+		],
+		"uriHandlers": [
+			{
+				"scheme": "mirai"
+			}
+		],
+		"configuration": {
+			"title": "Mirai Figma",
+			"properties": {
+				"mirai-figma.accessToken": {
+					"type": "string",
+					"default": "",
+					"description": "Your Figma access token. Generate at https://www.figma.com/developers/api#access-tokens or obtain via OAuth flow",
+					"scope": "application"
+				},
+				"mirai-figma.teamId": {
+					"type": "string",
+					"default": "",
+					"description": "Your Figma Team ID (optional)",
+					"scope": "application"
+				},
+				"mirai-figma.autoRefresh": {
+					"type": "boolean",
+					"default": true,
+					"description": "Automatically refresh Figma files on startup"
+				},
+				"mirai-figma.codeGeneration.framework": {
+					"type": "string",
+					"enum": ["react", "vue", "angular", "html"],
+					"default": "react",
+					"description": "Default framework for code generation"
+				}
+			}
+		},
+		"menus": {
+			"view/title": [
+				{
+					"command": "mirai-figma.refreshFiles",
+					"when": "view == mirai-figma-files",
+					"group": "navigation"
+				}
+			],
+			"commandPalette": [
+				{
+					"command": "mirai-figma.openFigmaPanel",
+					"when": "true"
+				},
+				{
+					"command": "mirai-figma.authenticateWithOAuth",
+					"when": "true"
+				},
+				{
+					"command": "mirai-figma.clearToken",
+					"when": "true"
+				},
+				{
+					"command": "mirai-figma.generateCodeWithChat",
+					"when": "true"
+				},
+				{
+					"command": "mirai-figma.analyzeDesignTokensWithChat",
+					"when": "true"
+				},
+				{
+					"command": "mirai-figma.reviewAccessibilityWithChat",
+					"when": "true"
+				},
+				{
+					"command": "mirai-figma.sendDesignToChat",
+					"when": "true"
+				},
+				{
+					"command": "mirai-figma.importDesignTokens",
+					"when": "true"
+				},
+				{
+					"command": "mirai-figma.generateCode",
+					"when": "true"
+				}
+			]
+		}
+	},
+	"scripts": {
+		"vscode:prepublish": "npm run compile",
+		"compile": "tsc -p ./",
+		"watch": "tsc -watch -p ./"
+	},
+	"devDependencies": {
+		"@types/node": "16.x",
+		"@types/vscode": "^1.74.0",
+		"typescript": "^4.9.4"
+	},
+	"dependencies": {
+		"axios": "^1.6.0",
+		"figma-api": "^1.11.0"
+	}
+}

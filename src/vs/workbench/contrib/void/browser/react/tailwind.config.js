@@ -49,6 +49,16 @@ module.exports = {
 			// common colors to use, ordered light to dark
 
 			colors: {
+				// Mirai brand colors
+				'mirai-primary': 'var(--mirai-primary)',
+				'mirai-primary-light': 'var(--mirai-primary-light)',
+				'mirai-primary-dark': 'var(--mirai-primary-dark)',
+				'mirai-secondary': 'var(--mirai-secondary)',
+				'mirai-accent': 'var(--mirai-accent)',
+				'mirai-surface': 'var(--mirai-surface)',
+				'mirai-surface-light': 'var(--mirai-surface-light)',
+				'mirai-surface-dark': 'var(--mirai-surface-dark)',
+
 				'void-bg-1': 'var(--void-bg-1)',
 				'void-bg-1-alt': 'var(--void-bg-1-alt)',
 				'void-bg-2': 'var(--void-bg-2)',

@@ -65,6 +65,10 @@ export const defaultProviderSettings = {
 		region: 'us-east-1', // add region setting
 		endpoint: '', // optionally allow overriding default
 	},
+	backendProxy: {
+		endpoint: 'http://localhost:3002',
+		apiKey: '', // For production use - user's API key for remote backend
+	},
 
 } as const
 
@@ -153,6 +157,29 @@ export const defaultModelsOfProvider = {
 	microsoftAzure: [],
 	awsBedrock: [],
 	liteLLM: [],
+	backendProxy: [
+		// OpenAI models
+		'gpt-4o',
+		'gpt-4o-mini',
+		'gpt-3.5-turbo',
+		'gpt-4-turbo',
+		'gpt-4',
+		// Anthropic/Claude models - Latest Claude 4 models
+		'claude-opus-4-0',
+		'claude-sonnet-4-0',
+		// Claude 3.7 models
+		'claude-3-7-sonnet-latest',
+		// Claude 3.5 models
+		'claude-3-5-sonnet-latest',
+		'claude-3-5-sonnet-20241022',
+		'claude-3-5-haiku-latest',
+		'claude-3-5-haiku-20241022',
+		// Claude 3 models
+		'claude-3-opus-latest',
+		'claude-3-opus-20240229',
+		'claude-3-sonnet-20240229',
+		'claude-3-haiku-20240307',
+	],
 
 
 } as const satisfies Record<ProviderName, string[]>
@@ -1474,6 +1501,26 @@ const modelSettingsOfProvider: { [providerName in ProviderName]: VoidStaticProvi
 	googleVertex: googleVertexSettings,
 	microsoftAzure: microsoftAzureSettings,
 	awsBedrock: awsBedrockSettings,
+	backendProxy: {
+		...openAISettings,
+		// Add Claude model capabilities to backend proxy
+		modelOptions: {
+			...openAISettings.modelOptions,
+			...anthropicSettings.modelOptions, // Include Claude models
+		},
+		// Override fallback to support both OpenAI and Anthropic models
+		modelOptionsFallback: (modelName) => {
+			// Try OpenAI fallback first
+			const openAIResult = openAISettings.modelOptionsFallback(modelName);
+			if (openAIResult) return openAIResult;
+
+			// Try Anthropic fallback
+			const anthropicResult = anthropicSettings.modelOptionsFallback(modelName);
+			if (anthropicResult) return anthropicResult;
+
+			return null;
+		}
+	},
 } as const
 
 
@@ -1500,16 +1547,46 @@ export const getModelCapabilities = (
 	for (const modelName_ in modelOptions) {
 		const lowercaseModelName_ = modelName_.toLowerCase()
 		if (lowercaseModelName === lowercaseModelName_) {
-			return { ...modelOptions[modelName], ...overrides, modelName, recognizedModelName: modelName, isUnrecognizedModel: false };
+			const baseCapabilities = { ...modelOptions[modelName], ...overrides, modelName, recognizedModelName: modelName, isUnrecognizedModel: false as const };
+
+			// Special handling for backendProxy - enable FIM for all models since backend proxy can handle conversion
+			if (providerName === 'backendProxy') {
+				return {
+					...baseCapabilities,
+					supportsFIM: true, // Backend proxy supports FIM for all models
+				};
+			}
+
+			return baseCapabilities;
 		}
 	}
 
 	const result = modelOptionsFallback(modelName)
 	if (result) {
-		return { ...result, ...overrides, modelName: result.modelName, isUnrecognizedModel: false };
+		const baseCapabilities = { ...result, ...overrides, modelName: result.modelName, isUnrecognizedModel: false as const };
+
+		// Special handling for backendProxy - enable FIM for all models since backend proxy can handle conversion
+		if (providerName === 'backendProxy') {
+			return {
+				...baseCapabilities,
+				supportsFIM: true, // Backend proxy supports FIM for all models
+			};
+		}
+
+		return baseCapabilities;
 	}
 
-	return { modelName, ...defaultModelOptions, ...overrides, isUnrecognizedModel: true };
+	const baseCapabilities = { modelName, ...defaultModelOptions, ...overrides, isUnrecognizedModel: true as const };
+
+	// Special handling for backendProxy - enable FIM for all models since backend proxy can handle conversion
+	if (providerName === 'backendProxy') {
+		return {
+			...baseCapabilities,
+			supportsFIM: true, // Backend proxy supports FIM for all models
+		};
+	}
+
+	return baseCapabilities;
 }
 
 // non-model settings

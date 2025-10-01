@@ -14,6 +14,7 @@ import { Event } from '../../../../base/common/event.js';
 import { Disposable } from '../../../../base/common/lifecycle.js';
 import { IVoidSettingsService } from './voidSettingsService.js';
 import { IMCPService } from './mcpService.js';
+import { IGlobalAuthService } from './globalAuthService.js';
 
 // calls channel to implement features
 export const ILLMMessageService = createDecorator<ILLMMessageService>('llmMessageService');
@@ -63,6 +64,7 @@ export class LLMMessageService extends Disposable implements ILLMMessageService 
 		@IVoidSettingsService private readonly voidSettingsService: IVoidSettingsService,
 		// @INotificationService private readonly notificationService: INotificationService,
 		@IMCPService private readonly mcpService: IMCPService,
+		@IGlobalAuthService private readonly globalAuthService: IGlobalAuthService,
 	) {
 		super()
 
@@ -76,6 +78,13 @@ export class LLMMessageService extends Disposable implements ILLMMessageService 
 			this.llmMessageHooks.onText[e.requestId]?.(e)
 		}))
 		this._register((this.channel.listen('onFinalMessage_sendLLMMessage') satisfies Event<EventLLMMessageOnFinalMessageParams>)(e => {
+			// Report token usage metrics
+			if (e.tokenUsage) {
+				this.reportTokenUsage(e.tokenUsage).catch(error => {
+					console.error('Failed to report token usage:', error.message);
+				});
+			}
+
 			this.llmMessageHooks.onFinalMessage[e.requestId]?.(e);
 			this._clearChannelHooks(e.requestId)
 		}))
@@ -103,9 +112,17 @@ export class LLMMessageService extends Disposable implements ILLMMessageService 
 	sendLLMMessage(params: ServiceSendLLMMessageParams) {
 		const { onText, onFinalMessage, onError, onAbort, modelSelection, ...proxyParams } = params;
 
+		// 🔐 AUTH GUARD: Check if user is authenticated
+		if (!this.globalAuthService.isAuthenticated) {
+			const message = 'Please authenticate with Mirai to use LLM features. Click the Accounts section in the bottom-left to sign in.';
+			onError({ message, fullError: new Error(message) });
+			return null;
+		}
+
+
 		// throw an error if no model/provider selected (this should usually never be reached, the UI should check this first, but might happen in cases like Apply where we haven't built much UI/checks yet, good practice to have check logic on backend)
 		if (modelSelection === null) {
-			const message = `Please add a provider in Void's Settings.`
+			const message = `Please add a provider in Mirai's Settings.`
 			onError({ message, fullError: null })
 			return null
 		}
@@ -119,6 +136,15 @@ export class LLMMessageService extends Disposable implements ILLMMessageService 
 		const { settingsOfProvider, } = this.voidSettingsService.state
 
 		const mcpTools = this.mcpService.getMCPTools()
+
+		// 🔐 Get Mirai Auth token for debugging
+		const miraiToken = this.globalAuthService.getMiraiToken();
+		if (miraiToken) {
+			const tokenPreview = miraiToken.substring(0, 20) + '...' + miraiToken.substring(miraiToken.length - 4);
+			console.log(`🔐 [LLM Service] Mirai token retrieved: ${tokenPreview}`);
+		} else {
+			console.log(`⚠️ [LLM Service] No Mirai token available`);
+		}
 
 		// add state for request id
 		const requestId = generateUuid();
@@ -134,6 +160,7 @@ export class LLMMessageService extends Disposable implements ILLMMessageService 
 			settingsOfProvider,
 			modelSelection,
 			mcpTools,
+			miraiToken: miraiToken, // 🔐 Pass Mirai Auth token
 		} satisfies MainSendLLMMessageParams);
 
 		return requestId
@@ -192,6 +219,93 @@ export class LLMMessageService extends Disposable implements ILLMMessageService 
 
 		delete this.listHooks.openAICompat.success[requestId]
 		delete this.listHooks.openAICompat.error[requestId]
+	}
+
+	/**
+	 * Simple, direct token usage reporting using global auth state
+	 */
+	private async reportTokenUsage(tokenUsage: any): Promise<void> {
+		console.log('🔄 [reportTokenUsage] Starting token usage reporting...');
+
+		// Declare URL at function level so it's accessible in catch block
+		const requestUrl = 'http://localhost:5173/api/vscode/token-usage';
+
+		try {
+			// Check auth state
+			const authToken = this.globalAuthService.getMiraiToken();
+
+			if (!authToken) {
+				return; // No auth token available
+			}
+
+
+			// Map VSCode provider names to server-expected format
+			const providerNameMap: Record<string, string> = {
+				'anthropic': 'Anthropic',
+				'cohere': 'Cohere',
+				'deepseek': 'Deepseek',
+				'google': 'Google',
+				'gemini': 'Google',  // VSCode uses 'gemini', server expects 'Google'
+				'groq': 'Groq',
+				'huggingface': 'HuggingFace',
+				'hyperbolic': 'Hyperbolic',
+				'mistral': 'Mistral',
+				'ollama': 'Ollama',
+				'openAI': 'OpenAI',
+				'openai': 'OpenAI',
+				'openrouter': 'OpenRouter',
+				'openaiCompatible': 'OpenAILike',
+				'perplexity': 'Perplexity',
+				'xai': 'xAI',
+				'together': 'Together',
+				'lmstudio': 'LMStudio',
+				'amazonbedrock': 'AmazonBedrock',
+				'github': 'Github'
+			};
+
+			const normalizedProvider = providerNameMap[tokenUsage.providerId] || tokenUsage.providerId;
+
+			// Transform data to match server's expected format
+			const serverPayload = {
+				model: tokenUsage.modelId,           // server expects "model"
+				provider: normalizedProvider,        // server expects specific provider names
+				promptTokens: tokenUsage.promptTokens,
+				completionTokens: tokenUsage.completionTokens,
+				totalTokens: tokenUsage.totalTokens,
+				requestType: tokenUsage.requestType,
+				timestamp: tokenUsage.timestamp,
+				...(tokenUsage.metaData && { metaData: tokenUsage.metaData }),
+				...(tokenUsage.rawUsage && { rawUsage: tokenUsage.rawUsage })
+			};
+
+			const requestPayload = JSON.stringify(serverPayload);
+
+			// Prepare request headers
+			const requestHeaders = {
+				'Content-Type': 'application/json',
+				'Authorization': `Bearer ${authToken}`,
+				'User-Agent': 'VSCode-LLM-Integration'
+			};
+
+
+			const response = await fetch(requestUrl, {
+				method: 'POST',
+				mode: 'cors',
+				credentials: 'omit',
+				headers: requestHeaders,
+				body: requestPayload
+			});
+
+			if (!response.ok) {
+				const errorText = await response.text().catch(() => 'Unable to read error response');
+				console.error('Token usage reporting failed:', {
+					status: response.status,
+					errorText: errorText.substring(0, 200)
+				});
+			}
+		} catch (error) {
+			console.error('Token usage reporting error:', error?.message || 'Unknown error');
+		}
 	}
 }
 

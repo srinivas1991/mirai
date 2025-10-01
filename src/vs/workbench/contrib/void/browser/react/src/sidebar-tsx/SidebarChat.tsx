@@ -16,6 +16,30 @@ import { ErrorDisplay } from './ErrorDisplay.js';
 import { BlockCode, TextAreaFns, VoidCustomDropdownBox, VoidInputBox2, VoidSlider, VoidSwitch, VoidDiffEditor } from '../util/inputs.js';
 import { ModelDropdown, } from '../void-settings-tsx/ModelDropdown.js';
 import { PastThreadsList } from './SidebarThreadSelector.js';
+
+const PastChatsView = ({ onBack }: { onBack: () => void }) => {
+	const accessor = useAccessor()
+	const chatThreadsService = accessor.get('IChatThreadService')
+
+	return (
+		<div className='w-full h-full max-h-full flex flex-col overflow-auto px-4'>
+			<div className='pt-4 pb-2'>
+				<div className='flex items-center gap-3 mb-4'>
+					<div
+						className='cursor-pointer text-void-fg-3 hover:text-void-fg-1 transition-colors'
+						onClick={onBack}
+					>
+						← Back
+					</div>
+					<div className='text-void-fg-1 text-lg font-medium'>Past Chats</div>
+				</div>
+			</div>
+			<ErrorBoundary>
+				<PastThreadsList />
+			</ErrorBoundary>
+		</div>
+	);
+};
 import { VOID_CTRL_L_ACTION_ID } from '../../../actionIDs.js';
 import { VOID_OPEN_SETTINGS_ACTION_ID } from '../../../voidSettingsPane.js';
 import { ChatMode, displayInfoOfProviderName, FeatureName, isFeatureNameDisabled } from '../../../../../../../workbench/contrib/void/common/voidSettingsTypes.js';
@@ -2892,6 +2916,30 @@ export const SidebarChat = () => {
 	// threads state
 	const chatThreadsState = useChatThreadsState()
 
+	// State to control showing past chats view
+	const [showPastChats, setShowPastChats] = useState(false)
+
+	// Listen for the "View Past Chats" command
+	useEffect(() => {
+		const handleViewPastChats = () => {
+			setShowPastChats(true)
+		}
+
+		// Listen for the history command
+		const disposable = commandService.onDidExecuteCommand((e) => {
+			if (e.commandId === 'void.historyAction') {
+				handleViewPastChats()
+			}
+		})
+
+		return () => disposable.dispose()
+	}, [commandService])
+
+	// Reset past chats view when thread changes
+	useEffect(() => {
+		setShowPastChats(false)
+	}, [chatThreadsState.currentThreadId])
+
 	const currentThread = chatThreadsService.getCurrentThread()
 	const previousMessages = currentThread?.messages ?? []
 
@@ -3097,7 +3145,7 @@ export const SidebarChat = () => {
 		{[
 			'Summarize my codebase',
 			'How do types work in Rust?',
-			'Create a .voidrules file for me'
+			'Create a .mirairules file for me'
 		].map((text, index) => (
 			<div
 				key={index}
@@ -3134,17 +3182,6 @@ export const SidebarChat = () => {
 			{landingPageInput}
 		</ErrorBoundary>
 
-		{Object.keys(chatThreadsState.allThreads).length > 1 ? // show if there are threads
-			<ErrorBoundary>
-				<div className='pt-8 mb-2 text-void-fg-3 text-root select-none pointer-events-none'>Previous Threads</div>
-				<PastThreadsList />
-			</ErrorBoundary>
-			:
-			<ErrorBoundary>
-				<div className='pt-8 mb-2 text-void-fg-3 text-root select-none pointer-events-none'>Suggestions</div>
-				{initiallySuggestedPromptsHTML}
-			</ErrorBoundary>
-		}
 	</div>
 
 
@@ -3174,6 +3211,11 @@ export const SidebarChat = () => {
 		</ErrorBoundary>
 	</div>
 
+
+	// Show past chats view if requested
+	if (showPastChats) {
+		return <PastChatsView onBack={() => setShowPastChats(false)} />
+	}
 
 	return (
 		<Fragment key={threadId} // force rerender when change thread
