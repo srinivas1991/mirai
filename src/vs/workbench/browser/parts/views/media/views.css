@@ -318,3 +318,42 @@
 	color: var(--vscode-inputOption-activeForeground);
 	background-color: var(--vscode-inputOption-activeBackground);
 }
+
+/* Modern UI Enhancements for Views */
+.customview-tree .monaco-list .monaco-list-row {
+	transition: background-color 0.15s ease-in-out, transform 0.1s ease-in-out;
+	border-radius: 4px;
+	margin: 1px 4px;
+}
+
+.customview-tree .monaco-list .monaco-list-row:hover {
+	background-color: var(--vscode-list-hoverBackground);
+}
+
+.customview-tree .monaco-list .monaco-list-row:hover .custom-view-tree-node-item {
+	transform: translateX(2px);
+}
+
+/* Smooth transitions for icons */
+.customview-tree .monaco-list .monaco-list-row .custom-view-tree-node-item-icon {
+	transition: opacity 0.15s ease-in-out;
+}
+
+.customview-tree .monaco-list .monaco-list-row:hover .custom-view-tree-node-item-icon {
+	opacity: 1;
+}
+
+/* Better section headers */
+.monaco-workbench .pane > .pane-header {
+	transition: background-color 0.15s ease-in-out;
+}
+
+.monaco-workbench .pane > .pane-header:hover {
+	background-color: var(--vscode-sideBarSectionHeader-background);
+}
+
+/* Smooth scrolling */
+.monaco-workbench .tree-explorer-viewlet-tree-view,
+.monaco-workbench .customview-tree {
+	scroll-behavior: smooth;
+}

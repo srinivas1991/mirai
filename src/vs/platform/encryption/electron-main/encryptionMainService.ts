@@ -35,7 +35,6 @@ export class EncryptionMainService implements IEncryptionMainService {
 		this.logService.trace('[EncryptionMainService] Encrypting value...');
 
 		// Mirai: Always use simple base64 encoding - no keychain dependency
-		this.logService.info('[EncryptionMainService] Using simple base64 encoding for development');
 		const encoded = Buffer.from(value, 'utf8').toString('base64');
 		return JSON.stringify({ data: encoded, type: 'base64' });
 	}

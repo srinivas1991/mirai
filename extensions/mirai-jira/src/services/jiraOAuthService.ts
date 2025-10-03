@@ -29,10 +29,11 @@ export class JiraOAuthService {
 			oauthConfig = require('../../oauth.config.js');
 		} catch (error) {
 			// Fallback to environment variables or defaults
+			// Note: JIRA_REDIRECT_URI is not used from env as we generate it dynamically
 			oauthConfig = {
 				JIRA_CLIENT_ID: process.env.JIRA_CLIENT_ID || 'YOUR_JIRA_CLIENT_ID_HERE',
 				JIRA_CLIENT_SECRET: process.env.JIRA_CLIENT_SECRET || 'YOUR_JIRA_CLIENT_SECRET_HERE',
-				JIRA_REDIRECT_URI: 'mirai://mirai.mirai-jira/oauth-callback'
+				JIRA_REDIRECT_URI: '' // Will be generated dynamically
 			};
 		}
 
@@ -62,22 +63,37 @@ export class JiraOAuthService {
 			throw new Error('OAuth not configured. Please set CLIENT_ID and CLIENT_SECRET first, or use API token authentication instead.');
 		}
 
-		return new Promise((resolve, reject) => {
+		// Generate redirect URI dynamically using vscode.env.asExternalUri
+		const callbackUri = await vscode.env.asExternalUri(vscode.Uri.parse(`${vscode.env.uriScheme}://mirai.mirai-jira/oauth-callback`));
+
+		// Remove the windowId parameter that VS Code adds automatically
+		const redirectUriString = callbackUri.toString(true);
+		config.redirectUri = redirectUriString.split('?')[0]; // Remove query parameters
+
+		console.log('[Jira OAuth Debug] Redirect URI:', config.redirectUri);
+		return new Promise(async (resolve, reject) => {
 			// Register URI handler for OAuth callback
 			this.uriHandler = vscode.window.registerUriHandler({
 				handleUri: async (uri: vscode.Uri) => {
+					console.log('[Jira OAuth Debug] Callback received:', uri.toString());
 					try {
 						// Parse the callback URI
 						const query = new URLSearchParams(uri.query);
 						const code = query.get('code');
 						const error = query.get('error');
+						const errorDescription = query.get('error_description');
 						const state = query.get('state');
+
+						console.log('[Jira OAuth Debug] Code:', code);
+						console.log('[Jira OAuth Debug] Error:', error);
+						console.log('[Jira OAuth Debug] State:', state);
 
 						// Clean up the handler
 						this.cleanup();
 
 						if (error) {
-							reject(new Error(`OAuth error: ${error}`));
+							const errorMsg = errorDescription || error;
+							reject(new Error(`OAuth error: ${errorMsg}`));
 							return;
 						}
 
@@ -93,9 +109,12 @@ export class JiraOAuthService {
 						}
 
 						// Exchange code for access token
-						const tokens = await this.exchangeCodeForToken(code);
+						console.log('[Jira OAuth Debug] Exchanging code for token...');
+						const tokens = await this.exchangeCodeForToken(code, config.redirectUri);
+						console.log('[Jira OAuth Debug] Token exchange successful');
 						resolve(tokens);
 					} catch (err) {
+						console.error('[Jira OAuth Debug] Error in callback handler:', err);
 						this.cleanup();
 						reject(err);
 					}
@@ -103,8 +122,16 @@ export class JiraOAuthService {
 			});
 
 			// Open the authorization URL in the browser
-			const authUrl = this.buildAuthUrl();
-			vscode.env.openExternal(vscode.Uri.parse(authUrl));
+			const authUrl = this.buildAuthUrl(config);
+			console.log('[Jira OAuth Debug] Authorization URL:', authUrl);
+
+			// Try to open the URL
+			const opened = await vscode.env.openExternal(vscode.Uri.parse(authUrl));
+			if (!opened) {
+				this.cleanup();
+				reject(new Error('Failed to open browser for authentication'));
+				return;
+			}
 
 			// Set a timeout for the authentication process (5 minutes)
 			setTimeout(() => {
@@ -114,22 +141,27 @@ export class JiraOAuthService {
 		});
 	}
 
-	private buildAuthUrl(): string {
-		const config = this.getConfig();
-		const params = new URLSearchParams({
-			audience: config.audience,
-			client_id: config.clientId,
-			scope: config.scope,
-			redirect_uri: config.redirectUri,
-			response_type: 'code',
-			state: 'mirai-jira-auth',
-			prompt: 'consent'
-		});
+	private buildAuthUrl(config: JiraOAuthConfig): string {
+		console.log('[Jira OAuth Debug] Building authorization URL with config:', config.redirectUri);
 
-		return `https://auth.atlassian.com/authorize?${params.toString()}`;
+		// Build the authorization URL manually to ensure proper encoding
+		const baseUrl = 'https://auth.atlassian.com/authorize';
+		const params = new URLSearchParams();
+		params.append('audience', config.audience);
+		params.append('client_id', config.clientId);
+		params.append('scope', config.scope);
+		params.append('redirect_uri', config.redirectUri);
+		params.append('response_type', 'code');
+		params.append('state', 'mirai-jira-auth');
+		params.append('prompt', 'consent');
+
+		const fullUrl = `${baseUrl}?${params.toString()}`;
+		console.log('[Jira OAuth Debug] Full authorization URL:', fullUrl);
+
+		return fullUrl;
 	}
 
-	private async exchangeCodeForToken(code: string): Promise<{ accessToken: string; refreshToken: string; cloudId: string; siteUrl: string; siteName: string }> {
+	private async exchangeCodeForToken(code: string, redirectUri: string): Promise<{ accessToken: string; refreshToken: string; cloudId: string; siteUrl: string; siteName: string }> {
 		const config = this.getConfig();
 		try {
 			// Step 1: Exchange code for access token
@@ -138,7 +170,7 @@ export class JiraOAuthService {
 			formData.append('client_id', config.clientId);
 			formData.append('client_secret', config.clientSecret);
 			formData.append('code', code);
-			formData.append('redirect_uri', config.redirectUri);
+			formData.append('redirect_uri', redirectUri);
 
 			const tokenResponse = await axios.post('https://auth.atlassian.com/oauth/token', formData, {
 				headers: {
@@ -264,7 +296,7 @@ export class JiraOAuthService {
 		return {
 			clientId: '', // Your Atlassian app client ID
 			clientSecret: '', // Your Atlassian app client secret
-			redirectUri: 'mirai://mirai.mirai-jira/oauth-callback',
+			redirectUri: '', // Generated dynamically during authentication
 			scope: JiraOAuthService.DEFAULT_SCOPE,
 			audience: JiraOAuthService.DEFAULT_AUDIENCE
 		};

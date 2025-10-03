@@ -19,6 +19,8 @@ import { RawToolParamsObj } from '../common/sendLLMMessageTypes.js'
 import { MAX_CHILDREN_URIs_PAGE, MAX_FILE_CHARS_PAGE, MAX_TERMINAL_BG_COMMAND_TIME, MAX_TERMINAL_INACTIVE_TIME } from '../common/prompt/prompts.js'
 import { IVoidSettingsService } from '../common/voidSettingsService.js'
 import { generateUuid } from '../../../../base/common/uuid.js'
+import { IWorkspaceEditingService } from '../../../services/workspaces/common/workspaceEditing.js'
+import { dirname } from '../../../../base/common/resources.js'
 
 
 // tool use for AI
@@ -143,7 +145,7 @@ export class ToolsService implements IToolsService {
 
 	constructor(
 		@IFileService fileService: IFileService,
-		@IWorkspaceContextService workspaceContextService: IWorkspaceContextService,
+		@IWorkspaceContextService private readonly workspaceContextService: IWorkspaceContextService,
 		@ISearchService searchService: ISearchService,
 		@IInstantiationService instantiationService: IInstantiationService,
 		@IVoidModelService voidModelService: IVoidModelService,
@@ -153,6 +155,7 @@ export class ToolsService implements IToolsService {
 		@IDirectoryStrService private readonly directoryStrService: IDirectoryStrService,
 		@IMarkerService private readonly markerService: IMarkerService,
 		@IVoidSettingsService private readonly voidSettingsService: IVoidSettingsService,
+		@IWorkspaceEditingService private readonly workspaceEditingService: IWorkspaceEditingService,
 	) {
 		const queryBuilder = instantiationService.createInstance(QueryBuilder);
 
@@ -397,11 +400,15 @@ export class ToolsService implements IToolsService {
 			// ---
 
 			create_file_or_folder: async ({ uri, isFolder }) => {
-				if (isFolder)
+				if (isFolder) {
 					await fileService.createFolder(uri)
-				else {
+				} else {
 					await fileService.createFile(uri)
 				}
+
+				// Auto-add folder to workspace if needed
+				await this.autoAddFolderToWorkspace(uri, isFolder)
+
 				return { result: {} }
 			},
 
@@ -417,6 +424,10 @@ export class ToolsService implements IToolsService {
 				}
 				await editCodeService.callBeforeApplyOrEdit(uri)
 				editCodeService.instantlyRewriteFile({ uri, newContent })
+
+				// Auto-add folder to workspace if needed
+				await this.autoAddFolderToWorkspace(uri, false)
+
 				// at end, get lint errors
 				const lintErrorsPromise = Promise.resolve().then(async () => {
 					await timeout(2000)
@@ -433,6 +444,9 @@ export class ToolsService implements IToolsService {
 				}
 				await editCodeService.callBeforeApplyOrEdit(uri)
 				editCodeService.instantlyApplySearchReplaceBlocks({ uri, searchReplaceBlocks })
+
+				// Auto-add folder to workspace if needed
+				await this.autoAddFolderToWorkspace(uri, false)
 
 				// at end, get lint errors
 				const lintErrorsPromise = Promise.resolve().then(async () => {
@@ -585,6 +599,53 @@ export class ToolsService implements IToolsService {
 
 		if (!lintErrors.length) return { lintErrors: null }
 		return { lintErrors, }
+	}
+
+	/**
+	 * Checks if we should auto-add a folder to workspace
+	 */
+	private async shouldAutoAddToWorkspace(uri: URI, isFolder: boolean): Promise<boolean> {
+		// For files, get the parent directory. For folders, use the folder itself.
+		const folderToAdd = isFolder ? uri : dirname(uri)
+
+		// Check if this folder (or a parent of it) is already in the workspace
+		const existingFolder = this.workspaceContextService.getWorkspaceFolder(folderToAdd)
+		if (existingFolder) {
+			console.log(`Folder ${folderToAdd.fsPath} is already in workspace (or under existing folder ${existingFolder.uri.fsPath})`)
+			return false
+		}
+
+		// Add if workspace is empty OR if this is a new folder not covered by existing workspace folders
+		return true
+	}
+
+	/**
+	 * Adds a folder to the workspace
+	 */
+	private async addToWorkspace(uri: URI, isFolder: boolean): Promise<void> {
+		try {
+			// For files, get the parent directory. For folders, use the folder itself.
+			const folderToAdd = isFolder ? uri : dirname(uri)
+
+			// Add the folder to the workspace
+			await this.workspaceEditingService.addFolders([{ uri: folderToAdd }])
+			console.log(`Added folder to workspace: ${folderToAdd.fsPath}`)
+		} catch (error) {
+			// Silently ignore errors - workspace addition is a convenience feature
+			// and shouldn't break the file creation process
+			console.warn('Failed to auto-add folder to workspace:', error)
+		}
+	}
+
+	/**
+	 * Automatically adds a folder to the workspace if the workspace is empty and a file/folder is created.
+	 * This helps make newly created projects visible in the file explorer.
+	 */
+	private async autoAddFolderToWorkspace(uri: URI, isFolder: boolean): Promise<void> {
+		const shouldAdd = await this.shouldAutoAddToWorkspace(uri, isFolder)
+		if (shouldAdd) {
+			await this.addToWorkspace(uri, isFolder)
+		}
 	}
 
 

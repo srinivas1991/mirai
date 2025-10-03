@@ -15,6 +15,35 @@ import { chat_userMessageContent, isABuiltinToolName } from '../common/prompt/pr
 import { AnthropicReasoning, getErrorMessage, RawToolCallObj, RawToolParamsObj } from '../common/sendLLMMessageTypes.js';
 import { generateUuid } from '../../../../base/common/uuid.js';
 import { FeatureName, ModelSelection, ModelSelectionOptions } from '../common/voidSettingsTypes.js';
+import { getModelCapabilities } from '../common/modelCapabilities.js';
+
+// 🧠 Helper function to auto-enable reasoning for reasoning-capable models
+const getModelSelectionOptionsWithAutoReasoning = (
+	modelSelection: ModelSelection | null,
+	overridesOfModel: any
+): ModelSelectionOptions | undefined => {
+	if (!modelSelection) return undefined;
+
+	const { reasoningCapabilities } = getModelCapabilities(modelSelection.providerName, modelSelection.modelName, overridesOfModel);
+	if (!reasoningCapabilities || !reasoningCapabilities.supportsReasoning) return undefined;
+
+	const { reasoningSlider } = reasoningCapabilities;
+	if (reasoningSlider?.type === 'budget_slider') {
+		return {
+			reasoningEnabled: true,
+			reasoningBudget: reasoningSlider.default
+		};
+	} else if (reasoningSlider?.type === 'effort_slider') {
+		return {
+			reasoningEnabled: true,
+			reasoningEffort: reasoningSlider.default
+		};
+	} else {
+		return {
+			reasoningEnabled: true
+		};
+	}
+};
 import { IVoidSettingsService } from '../common/voidSettingsService.js';
 import { approvalTypeOfBuiltinToolName, BuiltinToolCallParams, ToolCallParams, ToolName, ToolResult } from '../common/toolsServiceTypes.js';
 import { IToolsService } from './toolsService.js';
@@ -493,7 +522,17 @@ class ChatThreadService extends Disposable implements IChatThreadService {
 		// these settings should not change throughout the loop (eg anthropic breaks if you change its thinking mode and it's using tools)
 		const featureName: FeatureName = 'Chat'
 		const modelSelection = this._settingsService.state.modelSelectionOfFeature[featureName]
-		const modelSelectionOptions = modelSelection ? this._settingsService.state.optionsOfModelSelection[featureName][modelSelection.providerName]?.[modelSelection.modelName] : undefined
+
+		// 🧠 AUTO-ENABLE REASONING: Always enable reasoning for reasoning-capable models
+		const modelSelectionOptions = getModelSelectionOptionsWithAutoReasoning(
+			modelSelection,
+			this._settingsService.state.overridesOfModel
+		);
+
+		if (modelSelectionOptions) {
+			console.log('🧠 Auto-enabled reasoning for', modelSelection?.modelName, 'with options:', modelSelectionOptions)
+		}
+
 		return { modelSelection, modelSelectionOptions }
 	}
 

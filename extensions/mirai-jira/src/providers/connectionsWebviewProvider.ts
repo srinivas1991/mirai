@@ -157,12 +157,6 @@ export class ConnectionsWebviewProvider implements vscode.WebviewViewProvider {
 					command: 'mirai-jira.authenticateWithOAuth',
 					icon: '🔐',
 					primary: true
-				},
-				{
-					id: 'configure',
-					label: 'Configure Settings',
-					command: 'mirai-jira.openJiraPanel',
-					icon: '⚙️'
 				}
 			]
 		};

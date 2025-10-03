@@ -1,11 +1,11 @@
 import * as vscode from 'vscode';
 import { JiraApiService } from './services/jiraApiService';
 import { JiraIssueProvider } from './providers/jiraIssueProvider';
-import { JiraWebviewProvider } from './providers/jiraWebviewProvider';
 import { ConnectionsWebviewProvider } from './providers/connectionsWebviewProvider';
 import { JiraChatService } from './services/jiraChatService';
 import { JiraOAuthService } from './services/jiraOAuthService';
 import { GitService } from './services/gitService';
+import { JiraRepoDiscoveryService } from './services/jiraRepoDiscoveryService';
 
 export function activate(context: vscode.ExtensionContext) {
 	console.log('🚀 Mirai Jira extension is now active! - BUILD VERSION: 2024-09-24-22:10');
@@ -16,10 +16,10 @@ export function activate(context: vscode.ExtensionContext) {
 	// Initialize services
 	const jiraApi = new JiraApiService();
 	const jiraChatService = new JiraChatService(jiraApi);
+	const jiraRepoDiscovery = new JiraRepoDiscoveryService(jiraApi);
 
 	// Initialize providers
 	const jiraIssueProvider = new JiraIssueProvider(jiraApi);
-	const jiraWebviewProvider = new JiraWebviewProvider(context.extensionUri, jiraApi);
 	const connectionsProvider = new ConnectionsWebviewProvider(context.extensionUri);
 
 	// Set up context keys for conditional views
@@ -53,11 +53,6 @@ export function activate(context: vscode.ExtensionContext) {
 	// Register webview providers
 	console.log('📋 [Extension] Registering webview providers...');
 	context.subscriptions.push(
-		vscode.window.registerWebviewViewProvider('mirai-jira-ai', jiraWebviewProvider, {
-			webviewOptions: {
-				retainContextWhenHidden: true
-			}
-		}),
 		vscode.window.registerWebviewViewProvider('mirai-connections-view', connectionsProvider, {
 			webviewOptions: {
 				retainContextWhenHidden: true
@@ -124,10 +119,6 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// Register commands
 	const commands = [
-		vscode.commands.registerCommand('mirai-jira.openJiraPanel', async () => {
-			await jiraWebviewProvider.show();
-		}),
-
 		vscode.commands.registerCommand('mirai-jira.authenticateWithToken', async () => {
 			try {
 				// Directly call the authentication logic here
@@ -645,6 +636,42 @@ export function activate(context: vscode.ExtensionContext) {
 			}
 
 			await jiraChatService.sendIssueToChat(issueKey);
+		}),
+
+		// 🔍 Discover Repositories for Ticket (AI-Powered)
+		vscode.commands.registerCommand('mirai-jira.discoverReposForTicket', async (treeItem?: any) => {
+			let issueKey: string;
+
+			// If called from tree view context menu, extract issue key from tree item
+			if (treeItem && treeItem.issue && treeItem.issue.key) {
+				issueKey = treeItem.issue.key;
+			} else if (treeItem && typeof treeItem === 'string') {
+				// If called directly with issue key
+				issueKey = treeItem;
+			} else {
+				// If no issue key provided, prompt for one
+				const inputKey = await vscode.window.showInputBox({
+					prompt: 'Enter a Jira issue key to discover repositories',
+					placeHolder: 'e.g., PROJ-123, TEAM-456',
+					validateInput: (value) => {
+						if (!value) {
+							return 'Issue key is required';
+						}
+						if (!value.match(/^[A-Z]+-\d+$/i)) {
+							return 'Invalid issue key format. Expected format: PROJ-123';
+						}
+						return undefined;
+					}
+				});
+
+				if (!inputKey) {
+					return;
+				}
+				issueKey = inputKey.toUpperCase();
+			}
+
+			console.log(`🔍 [RepoDiscovery] Starting discovery for ticket: ${issueKey}`);
+			await jiraRepoDiscovery.discoverReposForTicket(issueKey);
 		})
 	];
 

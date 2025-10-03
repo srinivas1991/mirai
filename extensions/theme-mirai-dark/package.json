@@ -1,0 +1,28 @@
+{
+  "name": "theme-mirai-dark",
+  "displayName": "Mirai Dark Theme",
+  "description": "A beautiful dark theme with blue and purple accents inspired by the Mirai logo",
+  "version": "1.0.0",
+  "publisher": "void",
+  "license": "MIT",
+  "engines": {
+    "vscode": "*"
+  },
+  "categories": ["Themes"],
+  "contributes": {
+    "themes": [
+      {
+        "id": "Mirai Dark",
+        "label": "Mirai Dark",
+        "uiTheme": "vs-dark",
+        "path": "./themes/mirai-dark-color-theme.json"
+      }
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/voideditor/void.git"
+  }
+}
+
+

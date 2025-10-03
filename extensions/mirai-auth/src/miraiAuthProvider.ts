@@ -46,22 +46,21 @@ export class MiraiAuthenticationProvider implements vscode.AuthenticationProvide
 	}
 
 	async getSessions(scopes?: readonly string[]): Promise<vscode.AuthenticationSession[]> {
-		console.log('🔍 [MiraiAuth] Getting sessions, count:', this._sessions.length);
 		return this._sessions;
 	}
 
 	async createSession(scopes: readonly string[]): Promise<vscode.AuthenticationSession> {
-		console.log('🔐 [MiraiAuth] Creating new session...');
-
 		try {
 			// Generate a unique state for this auth request
 			const state = Math.random().toString(36).substring(7);
-			const redirectUri = 'mirai://mirai.mirai-auth/auth-callback';
+
+			// Use vscode.env.asExternalUri to create a proper callback URI
+			const rawUri = `${vscode.env.uriScheme}://mirai.mirai-auth/auth-callback`;
+			const callbackUri = await vscode.env.asExternalUri(vscode.Uri.parse(rawUri));
+			const redirectUri = callbackUri.toString(true);
 
 			// Create the auth URL - this opens the web authentication page
 			const authUrl = `${this._client.defaults.baseURL}/auth/vscode?redirect=${encodeURIComponent(redirectUri)}&state=${state}`;
-
-			console.log('🌐 [MiraiAuth] Opening auth URL:', authUrl);
 
 			// Open browser for authentication
 			const opened = await vscode.env.openExternal(vscode.Uri.parse(authUrl));
@@ -75,8 +74,6 @@ export class MiraiAuthenticationProvider implements vscode.AuthenticationProvide
 				'Cancel'
 			).then(result => {
 				if (result === 'Cancel' && this._pendingAuth) {
-					console.log('🚫 [MiraiAuth] User cancelled authentication');
-					// clearTimeout(this._pendingAuth.timeout); // No timeout to clear anymore
 					this._pendingAuth.reject(new Error('Authentication cancelled by user'));
 					this._pendingAuth = null;
 				}
@@ -99,8 +96,6 @@ export class MiraiAuthenticationProvider implements vscode.AuthenticationProvide
 				};
 			});
 
-			console.log('⏳ [MiraiAuth] Waiting for callback...');
-
 			// Wait for callback without fallback polling
 			let tempToken: string;
 			try {
@@ -115,7 +110,6 @@ export class MiraiAuthenticationProvider implements vscode.AuthenticationProvide
 			}
 
 			// Exchange the temporary token for a long-lived access token
-			console.log('🔄 [MiraiAuth] Exchanging temporary token for session...');
 			const tokenResponse = await this._client.post('/api/vscode/auth', {
 				token: tempToken
 			});
@@ -144,13 +138,11 @@ export class MiraiAuthenticationProvider implements vscode.AuthenticationProvide
 				changed: []
 			});
 
-			console.log('✅ [MiraiAuth] Session created for user:', userData.name);
 			vscode.window.showInformationMessage(`Successfully signed in to Mirai as ${userData.name}! Credits: ${userData.credits}`);
 
 			return session;
 
 		} catch (error: any) {
-			console.error('❌ [MiraiAuth] Failed to create session:', error);
 			if (error.response?.status === 401) {
 				throw new Error('Invalid access token');
 			}
@@ -159,8 +151,6 @@ export class MiraiAuthenticationProvider implements vscode.AuthenticationProvide
 	}
 
 	async removeSession(sessionId: string): Promise<void> {
-		console.log('🗑️ [MiraiAuth] Removing session:', sessionId);
-
 		const sessionIndex = this._sessions.findIndex(s => s.id === sessionId);
 		if (sessionIndex > -1) {
 			const removedSession = this._sessions.splice(sessionIndex, 1)[0];
@@ -171,8 +161,6 @@ export class MiraiAuthenticationProvider implements vscode.AuthenticationProvide
 				removed: [removedSession],
 				changed: []
 			});
-
-			console.log('✅ [MiraiAuth] Session removed');
 		}
 	}
 
@@ -194,7 +182,6 @@ export class MiraiAuthenticationProvider implements vscode.AuthenticationProvide
 
 			return response.data.balance || 0;
 		} catch (error) {
-			console.error('Failed to fetch credit balance:', error);
 			throw new Error('Failed to fetch credit balance');
 		}
 	}
@@ -231,7 +218,6 @@ export class MiraiAuthenticationProvider implements vscode.AuthenticationProvide
 			if (error.response?.status === 402) {
 				throw new Error('Insufficient credits for this action');
 			}
-			console.error('Failed to deduct credits:', error);
 			throw new Error('Failed to process credit transaction');
 		}
 	}
@@ -268,7 +254,6 @@ export class MiraiAuthenticationProvider implements vscode.AuthenticationProvide
 			});
 
 		} catch (error) {
-			console.error('Failed to refresh session:', error);
 			// If token is invalid, remove the session
 			if (error instanceof Error && error.message.includes('401')) {
 				await this.removeSession(sessionId);
@@ -281,32 +266,27 @@ export class MiraiAuthenticationProvider implements vscode.AuthenticationProvide
 			const stored = await this.context.globalState.get<vscode.AuthenticationSession[]>('mirai-sessions');
 			if (stored) {
 				this._sessions = stored;
-				console.log('📂 [MiraiAuth] Loaded', this._sessions.length, 'stored sessions');
 			}
 		} catch (error) {
-			console.error('Failed to load sessions:', error);
+			// Failed to load sessions
 		}
 	}
 
 	private async storeSessions(): Promise<void> {
 		try {
 			await this.context.globalState.update('mirai-sessions', this._sessions);
-			console.log('💾 [MiraiAuth] Stored', this._sessions.length, 'sessions');
 		} catch (error) {
-			console.error('Failed to store sessions:', error);
+			// Failed to store sessions
 		}
 	}
 
 	// Handle URI callbacks from the web authentication
 	async handleCallback(uri: vscode.Uri): Promise<void> {
-		console.log('📥 [MiraiAuth] Received callback:', uri.toString());
-
 		const query = new URLSearchParams(uri.query);
 		const token = query.get('token');
 		const state = query.get('state');
 
 		if (!this._pendingAuth) {
-			console.error('🚨 [MiraiAuth] No pending authentication request');
 			return;
 		}
 
@@ -319,18 +299,15 @@ export class MiraiAuthenticationProvider implements vscode.AuthenticationProvide
 		this._pendingAuth = null;
 
 		if (!token) {
-			console.error('🚨 [MiraiAuth] No token in callback');
 			reject(new Error('No token received in callback'));
 			return;
 		}
 
 		if (state !== expectedState) {
-			console.error('🚨 [MiraiAuth] State mismatch in callback');
 			reject(new Error('State mismatch in authentication callback'));
 			return;
 		}
 
-		console.log('✅ [MiraiAuth] Callback validated, resolving with token');
 		resolve(token);
 	}
 }

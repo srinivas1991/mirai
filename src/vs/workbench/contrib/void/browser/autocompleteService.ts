@@ -20,6 +20,7 @@ import { ILLMMessageService } from '../common/sendLLMMessageService.js';
 import { isWindows } from '../../../../base/common/platform.js';
 import { IVoidSettingsService } from '../common/voidSettingsService.js';
 import { FeatureName } from '../common/voidSettingsTypes.js';
+import { getModelCapabilities } from '../common/modelCapabilities.js';
 import { IConvertToLLMMessageService } from './convertToLLMMessageService.js';
 // import { IContextGatheringService } from './contextGatheringService.js';
 
@@ -792,7 +793,14 @@ export class AutocompleteService extends Disposable implements IAutocompleteServ
 		const featureName: FeatureName = 'Autocomplete'
 		const overridesOfModel = this._settingsService.state.overridesOfModel
 		const modelSelection = this._settingsService.state.modelSelectionOfFeature[featureName]
-		const modelSelectionOptions = modelSelection ? this._settingsService.state.optionsOfModelSelection[featureName][modelSelection.providerName]?.[modelSelection.modelName] : undefined
+
+		// 🧠 AUTO-ENABLE REASONING: Always enable reasoning for reasoning-capable models
+		const modelCapabilities = modelSelection ? getModelCapabilities(modelSelection.providerName, modelSelection.modelName, overridesOfModel) : null
+		const modelSelectionOptions = modelSelection && modelCapabilities?.reasoningCapabilities && modelCapabilities.reasoningCapabilities.supportsReasoning ? {
+			reasoningEnabled: true,
+			...(modelCapabilities.reasoningCapabilities.reasoningSlider?.type === 'budget_slider' ? { reasoningBudget: modelCapabilities.reasoningCapabilities.reasoningSlider.default } : {}),
+			...(modelCapabilities.reasoningCapabilities.reasoningSlider?.type === 'effort_slider' ? { reasoningEffort: modelCapabilities.reasoningCapabilities.reasoningSlider.default } : {}),
+		} : undefined
 
 		// set parameters of `newAutocompletion` appropriately
 		newAutocompletion.llmPromise = new Promise(async (resolve, reject) => {

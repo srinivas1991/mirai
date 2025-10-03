@@ -14,6 +14,7 @@ This extension supports OAuth authentication with Jira, but requires system-leve
 4. Add permissions:
    - **Jira API**: `read:jira-user`, `read:jira-work`, `write:jira-work`
 5. Set the **Callback URL** to: `mirai://mirai.mirai-jira/oauth-callback`
+   - Note: This URI is automatically adjusted based on your system configuration
 6. Save your app and note down the **Client ID** and **Client Secret**
 
 ### 2. Configure OAuth Credentials
@@ -25,10 +26,10 @@ This extension supports OAuth authentication with Jira, but requires system-leve
    ```javascript
    module.exports = {
        JIRA_CLIENT_ID: 'your_actual_client_id_here',
-       JIRA_CLIENT_SECRET: 'your_actual_client_secret_here',
-       JIRA_REDIRECT_URI: 'mirai://mirai.mirai-jira/oauth-callback'
+       JIRA_CLIENT_SECRET: 'your_actual_client_secret_here'
    };
    ```
+   - Note: JIRA_REDIRECT_URI is no longer needed; it's generated automatically
 3. Rename the file back to `oauth.config.js`
 
 **Option B: Using Environment Variables (Recommended for Production)**

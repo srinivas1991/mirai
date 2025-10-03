@@ -29,10 +29,11 @@ export class FigmaOAuthService {
 			oauthConfig = require('../../oauth.config.js');
 		} catch (error) {
 			// Fallback to environment variables or defaults
+			// Note: FIGMA_REDIRECT_URI is not used from env as we generate it dynamically
 			oauthConfig = {
 				FIGMA_CLIENT_ID: process.env.FIGMA_CLIENT_ID || 'YOUR_FIGMA_CLIENT_ID_HERE',
 				FIGMA_CLIENT_SECRET: process.env.FIGMA_CLIENT_SECRET || 'YOUR_FIGMA_CLIENT_SECRET_HERE',
-				FIGMA_REDIRECT_URI: 'mirai://mirai.mirai-figma/oauth-callback'
+				FIGMA_REDIRECT_URI: '' // Will be generated dynamically
 			};
 		}
 
@@ -60,6 +61,10 @@ export class FigmaOAuthService {
 		if (!this.isConfigured()) {
 			throw new Error('OAuth not configured. Please set CLIENT_ID and CLIENT_SECRET first.');
 		}
+
+		// Generate redirect URI dynamically using vscode.env.asExternalUri
+		const callbackUri = await vscode.env.asExternalUri(vscode.Uri.parse(`${vscode.env.uriScheme}://mirai.mirai-figma/oauth-callback`));
+		config.redirectUri = callbackUri.toString(true);
 
 		return new Promise((resolve, reject) => {
 			// Register URI handler for OAuth callback
@@ -174,7 +179,7 @@ export class FigmaOAuthService {
 		return {
 			clientId: '', // Your Figma app client ID
 			clientSecret: '', // Your Figma app client secret
-			redirectUri: 'mirai://mirai.mirai-figma/oauth-callback',
+			redirectUri: '', // Generated dynamically during authentication
 			scope: FigmaOAuthService.DEFAULT_SCOPE
 		};
 	}

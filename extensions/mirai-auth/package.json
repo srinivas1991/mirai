@@ -12,14 +12,38 @@
 	],
 	"activationEvents": [
 		"onAuthenticationRequest:mirai",
-		"onStartupFinished"
+		"onAuthenticationRequest:mirai-github",
+		"onStartupFinished",
+		"onView:mirai-auth.githubRepos"
 	],
 	"main": "./out/extension.js",
 	"contributes": {
+		"views": {
+			"scm": [
+				{
+					"id": "mirai-auth.githubRepos",
+					"name": "GitHub Repositories",
+					"icon": "$(github)",
+					"contextualTitle": "GitHub Repositories",
+					"visibility": "visible"
+				}
+			]
+		},
+		"viewsWelcome": [
+			{
+				"view": "mirai-auth.githubRepos",
+				"contents": "No GitHub repositories loaded.\n\n**Choose an authentication method:**\n\n[OAuth (Recommended)](command:mirai-auth.refreshGitHubRepos)\n\n[Personal Access Token](command:mirai-auth.addGitHubPAT)\n\nOAuth will show \"Authorize Mirai\" and is managed automatically.\n\nPersonal Access Token gives you full control but requires manual setup.",
+				"when": "true"
+			}
+		],
 		"authentication": [
 			{
 				"id": "mirai",
 				"label": "Mirai"
+			},
+			{
+				"id": "mirai-github",
+				"label": "GitHub (Mirai)"
 			}
 		],
 		"uriHandlers": [
@@ -40,6 +64,35 @@
 				"category": "Mirai"
 			},
 			{
+				"command": "mirai-auth.addGitHubPAT",
+				"title": "Add GitHub Personal Access Token",
+				"category": "GitHub",
+				"icon": "$(key)"
+			},
+			{
+				"command": "mirai-auth.removeGitHubPAT",
+				"title": "Remove GitHub Personal Access Token",
+				"category": "GitHub",
+				"icon": "$(trash)"
+			},
+			{
+				"command": "mirai-auth.refreshGitHubRepos",
+				"title": "Refresh GitHub Repositories",
+				"category": "GitHub",
+				"icon": "$(refresh)"
+			},
+			{
+				"command": "mirai-auth.listGitHubRepos",
+				"title": "List My GitHub Repositories",
+				"category": "GitHub",
+				"icon": "$(repo)"
+			},
+			{
+				"command": "mirai-auth.showRepoActions",
+				"title": "Show Repository Actions",
+				"category": "GitHub"
+			},
+			{
 				"command": "mirai-auth.test",
 				"title": "Test Mirai Auth Provider",
 				"category": "Mirai"
@@ -50,6 +103,32 @@
 				"category": "Mirai"
 			}
 		],
+		"menus": {
+			"view/title": [
+				{
+					"command": "mirai-auth.refreshGitHubRepos",
+					"when": "view == mirai-auth.githubRepos",
+					"group": "navigation@1"
+				},
+				{
+					"command": "mirai-auth.addGitHubPAT",
+					"when": "view == mirai-auth.githubRepos",
+					"group": "navigation@2"
+				},
+				{
+					"command": "mirai-auth.removeGitHubPAT",
+					"when": "view == mirai-auth.githubRepos",
+					"group": "navigation@3"
+				}
+			],
+			"view/item/context": [
+				{
+					"command": "mirai-auth.showRepoActions",
+					"when": "view == mirai-auth.githubRepos && viewItem == githubRepository",
+					"group": "inline"
+				}
+			]
+		},
 		"configuration": {
 			"title": "Mirai Authentication",
 			"properties": {

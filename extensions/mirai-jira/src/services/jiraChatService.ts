@@ -7,6 +7,24 @@ export class JiraChatService {
 	}
 
 	/**
+	 * Get Jira-specific context note for AI
+	 * Note: General workspace context (folders, files, structure) is already provided by the system
+	 * We only add a reminder to consider the workspace when analyzing Jira tickets
+	 */
+	private getJiraWorkspaceNote(): string {
+		const workspaceFolders = vscode.workspace.workspaceFolders;
+		if (!workspaceFolders || workspaceFolders.length === 0) {
+			return '';
+		}
+
+		// Just a brief note - the system message already has full workspace context
+		return `\n\n<jira_context_note>
+This Jira ticket should be analyzed in the context of the current workspace.
+Please provide specific, actionable guidance relevant to the codebase structure you can see in the system context.
+</jira_context_note>\n`;
+	}
+
+	/**
 	 * Check if user is authenticated and has enough credits for a feature
 	 */
 	private async checkCreditsAndAuth(feature: string): Promise<boolean> {
@@ -69,7 +87,8 @@ export class JiraChatService {
 		try {
 			const issue = await this.jiraApi.getIssue(issueKey);
 			const context = this.formatIssueForChat(issue);
-			const message = `I have a Jira issue that I'd like to discuss:\n\n${context}`;
+			const workspaceNote = this.getJiraWorkspaceNote();
+			const message = `I have a Jira issue that I'd like to discuss:\n\n${context}${workspaceNote}`;
 
 			// Use the same pattern as Figma extension for Mirai chat integration
 			try {
@@ -97,14 +116,16 @@ export class JiraChatService {
 		try {
 			const issue = await this.jiraApi.getIssue(issueKey);
 			const context = this.formatIssueForChat(issue);
+			const workspaceNote = this.getJiraWorkspaceNote();
 
-			const analysisPrompt = `Please analyze this Jira issue and provide insights:\n\n${context}\n\nPlease analyze:
+			const analysisPrompt = `Please analyze this Jira issue and provide insights:\n\n${context}${workspaceNote}\n\nPlease analyze:
 1. Requirements clarity and completeness
-2. Potential technical challenges
+2. Potential technical challenges (considering the current workspace)
 3. Estimated complexity
-4. Suggested approach or implementation strategy
+4. Suggested approach or implementation strategy (specific to this codebase)
 5. Dependencies or blockers
-6. Testing considerations`;
+6. Testing considerations
+7. Which files/modules in the current workspace might need changes`;
 
 			// Use the same pattern as Figma extension for Mirai chat integration
 			try {
@@ -132,15 +153,17 @@ export class JiraChatService {
 		try {
 			const issue = await this.jiraApi.getIssue(issueKey);
 			const context = this.formatIssueForChat(issue);
+			const workspaceNote = this.getJiraWorkspaceNote();
 
-			const codePrompt = `Based on this Jira issue, please help me generate relevant code:\n\n${context}\n\nPlease consider:
+			const codePrompt = `Based on this Jira issue, please help me generate relevant code:\n\n${context}${workspaceNote}\n\nPlease consider:
 1. The requirements described in the issue
-2. Best practices for the technology stack
+2. Best practices for the technology stack IN THIS CODEBASE
 3. Error handling and edge cases
 4. Testing approach
-5. Code structure and organization
+5. Code structure and organization that matches the current workspace
+6. Existing patterns and conventions in this codebase
 
-Generate code that addresses the requirements while being maintainable and well-documented.`;
+Generate code that addresses the requirements while being maintainable and well-documented, following the patterns used in the current workspace.`;
 
 			// Use the same pattern as Figma extension for Mirai chat integration
 			try {
@@ -388,21 +411,23 @@ Note: This analysis includes ALL issues in the sprint (${sprintIssues.length} to
 		try {
 			const issue = await this.jiraApi.getIssue(issueKey);
 			const context = this.formatIssueForChat(issue);
+			const workspaceNote = this.getJiraWorkspaceNote();
 
-			const estimationPrompt = `Please help me estimate the complexity and effort for this Jira issue:\n\n${context}\n\nPlease provide:
-1. Complexity rating (Low/Medium/High/Very High)
-2. Estimated development time
+			const estimationPrompt = `Please help me estimate the complexity and effort for this Jira issue:\n\n${context}${workspaceNote}\n\nPlease provide:
+1. Complexity rating (Low/Medium/High/Very High) BASED ON THE CURRENT CODEBASE
+2. Estimated development time (considering the structure of this workspace)
 3. Key factors affecting complexity
 4. Risks and uncertainties
-5. Dependencies that could impact timeline
-6. Breakdown of tasks if possible
+5. Dependencies that could impact timeline (within this codebase)
+6. Breakdown of tasks if possible (specific to files/modules in this workspace)
 
 Consider factors like:
-- Technical difficulty
+- Technical difficulty relative to this codebase
 - Scope and requirements clarity
-- Integration complexity
-- Testing requirements
-- Documentation needs`;
+- Integration complexity within the current architecture
+- Testing requirements (based on current test setup)
+- Documentation needs
+- How well this fits with the current codebase structure`;
 
 			// Use the same pattern as Figma extension for Mirai chat integration
 			try {
@@ -430,9 +455,10 @@ Consider factors like:
 		try {
 			const issue = await this.jiraApi.getIssue(issueKey);
 			const context = this.formatIssueForChat(issue);
+			const workspaceNote = this.getJiraWorkspaceNote();
 
-			const testPrompt = `Based on this Jira issue, please generate comprehensive test cases:\n\n${context}\n\nPlease provide:
-1. Unit test scenarios
+			const testPrompt = `Based on this Jira issue, please generate comprehensive test cases:\n\n${context}${workspaceNote}\n\nPlease provide:
+1. Unit test scenarios (using the testing framework in this workspace)
 2. Integration test cases
 3. End-to-end test scenarios
 4. Edge cases and boundary conditions
@@ -446,7 +472,8 @@ Format the test cases clearly with:
 - Prerequisites
 - Test steps
 - Expected results
-- Priority level`;
+- Priority level
+- Suggested file locations (based on the current workspace structure)`;
 
 			// Use the same pattern as Figma extension for Mirai chat integration
 			try {
@@ -499,18 +526,20 @@ ${this.extractTextFromDescription(issue.fields.description) || 'No description p
 		try {
 			const issue = await this.jiraApi.getIssue(issueKey);
 			const context = this.formatIssueForChat(issue);
+			const workspaceNote = this.getJiraWorkspaceNote();
 
-			const improvementPrompt = `Please review this Jira issue and suggest improvements:\n\n${context}\n\nPlease analyze and suggest improvements for:
+			const improvementPrompt = `Please review this Jira issue and suggest improvements:\n\n${context}${workspaceNote}\n\nPlease analyze and suggest improvements for:
 1. Issue description clarity and completeness
 2. Acceptance criteria (if missing or unclear)
-3. Technical specifications
+3. Technical specifications (considering the current codebase architecture)
 4. User story format and structure
 5. Labels and components organization
 6. Priority and severity alignment
-7. Dependencies identification
-8. Risk assessment
+7. Dependencies identification (within the current workspace)
+8. Risk assessment (specific to this codebase)
+9. Implementation feasibility given the current workspace structure
 
-Provide specific, actionable recommendations to make this issue more effective for development.`;
+Provide specific, actionable recommendations to make this issue more effective for development in THIS specific codebase.`;
 
 			// Use the same pattern as Figma extension for Mirai chat integration
 			try {

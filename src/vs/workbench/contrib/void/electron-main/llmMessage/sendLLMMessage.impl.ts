@@ -250,10 +250,14 @@ const rawToolCallObjOfParamsStr = (name: string, toolParamsStr: string, id: stri
 	try { input = JSON.parse(toolParamsStr) }
 	catch (e) { return null }
 
-	if (input === null) return null
-	if (typeof input !== 'object') return null
+	if (input === null) {
+		input = {}
+	}
+	if (typeof input !== 'object') {
+		input = {}
+	}
 
-	const rawParams: RawToolParamsObj = input
+	const rawParams: RawToolParamsObj = input as RawToolParamsObj
 	return { id, name, rawParams, doneParams: Object.keys(rawParams), isDone: true }
 }
 
@@ -357,9 +361,6 @@ const _sendBackendProxyChat = async ({ messages, onText, onFinalMessage, onError
 		modelSelectionOptions: modelSelectionOptions,  // ✅ ADDED: For reasoning settings
 		overridesOfModel: overridesOfModel,  // ✅ ADDED: For custom model configuration
 	}
-
-
-
 	let fullTextSoFar = ''
 	let fullReasoningSoFar = ''
 	let toolCall: any = null  // Store the complete tool call
@@ -482,17 +483,7 @@ const _sendBackendProxyChat = async ({ messages, onText, onFinalMessage, onError
 			}
 		}
 
-		// Report token usage
-		const estimatedUsage = {
-			promptTokens: Math.ceil(JSON.stringify(messages).length / 4),
-			completionTokens: Math.ceil(fullTextSoFar.length / 4),
-			totalTokens: Math.ceil((JSON.stringify(messages).length + fullTextSoFar.length) / 4),
-			providerId: 'backendProxy',
-			modelId: modelName_,
-			requestType: 'chat' as const,
-			timestamp: new Date().toISOString(),
-		}
-		reportTokenUsage(estimatedUsage, 'chat')
+
 
 		// Process final tool call if any
 		if (toolCallInProgress.id && toolCallInProgress.function?.name) {

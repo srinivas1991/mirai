@@ -65,11 +65,14 @@ export class ElectronURLListener extends Disposable {
 			});
 
 		this._register(onOpenElectronUrl(url => {
+			logService.info('[ElectronURLListener] Received open-url event from macOS:', url);
 			const uri = this.uriFromRawUrl(url);
 			if (!uri) {
+				logService.error('[ElectronURLListener] Failed to parse URI:', url);
 				return;
 			}
 
+			logService.info('[ElectronURLListener] Parsed URI successfully, forwarding to urlService:', uri.toString());
 			this.urlService.open(uri, { originalUrl: url });
 		}));
 

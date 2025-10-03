@@ -12,6 +12,7 @@ This extension supports OAuth authentication with Figma, but requires system-lev
    - **App name**: Mirai Editor (or your preferred name)
    - **Description**: Figma integration for Mirai Editor
 4. Set the **Redirect URI** to: `mirai://mirai.mirai-figma/oauth-callback`
+   - Note: This URI is automatically adjusted based on your system configuration
 5. Save your app and note down the **Client ID** and **Client Secret**
 
 ### 2. Configure OAuth Credentials
@@ -23,10 +24,10 @@ This extension supports OAuth authentication with Figma, but requires system-lev
    ```javascript
    module.exports = {
        FIGMA_CLIENT_ID: 'your_actual_client_id_here',
-       FIGMA_CLIENT_SECRET: 'your_actual_client_secret_here',
-       FIGMA_REDIRECT_URI: 'mirai://mirai.mirai-figma/oauth-callback'
+       FIGMA_CLIENT_SECRET: 'your_actual_client_secret_here'
    };
    ```
+   - Note: FIGMA_REDIRECT_URI is no longer needed; it's generated automatically
 3. Rename the file back to `oauth.config.js`
 
 **Option B: Using Environment Variables (Recommended for Production)**

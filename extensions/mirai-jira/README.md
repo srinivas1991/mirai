@@ -69,7 +69,7 @@ Seamlessly integrate Jira issues into your Mirai workflow with AI-powered analys
 
 #### Analyze an Issue
 1. Select an issue from the tree view
-2. Right-click and choose "Analyze with AI" or use the AI Tools panel
+2. Right-click and choose "Analyze with AI"
 3. The AI will provide insights on complexity, approach, and considerations
 
 #### Generate Code

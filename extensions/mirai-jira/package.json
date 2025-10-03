@@ -19,7 +19,6 @@
 		"agile"
 	],
 	"activationEvents": [
-		"onCommand:mirai-jira.openJiraPanel",
 		"onCommand:mirai-jira.refreshIssues",
 		"onCommand:mirai-jira.createIssue",
 		"onCommand:mirai-jira.authenticateWithToken",
@@ -28,17 +27,12 @@
 		"onCommand:mirai-jira.analyzeIssueWithChat",
 		"onCommand:mirai-jira.generateCodeFromIssue",
 		"onCommand:mirai-jira.sendIssueToChat",
+		"onCommand:mirai-jira.discoverReposForTicket",
 		"onView:mirai-jira-panel"
 	],
 	"main": "./out/extension.js",
 	"contributes": {
 		"commands": [
-			{
-				"command": "mirai-jira.openJiraPanel",
-				"title": "Open Jira Panel",
-				"category": "Mirai Jira",
-				"icon": "$(project)"
-			},
 			{
 				"command": "mirai-jira.refreshIssues",
 				"title": "Refresh Issues",
@@ -183,13 +177,19 @@
 				"category": "Mirai Jira",
 				"icon": "$(comment-discussion)"
 			},
-			{
-				"command": "mirai-jira.estimateComplexity",
-				"title": "Estimate Work",
-				"category": "Mirai Jira",
-				"icon": "$(calculator)"
-			}
-		],
+		{
+			"command": "mirai-jira.estimateComplexity",
+			"title": "Estimate Work",
+			"category": "Mirai Jira",
+			"icon": "$(calculator)"
+		},
+		{
+			"command": "mirai-jira.discoverReposForTicket",
+			"title": "Discover Repositories with AI",
+			"category": "Mirai Jira",
+			"icon": "$(search)"
+		}
+	],
 		"views": {
 			"mirai-jira": [
 				{
@@ -197,17 +197,11 @@
 					"name": "Connect to Jira",
 					"when": "!mirai-jira:authenticated"
 				},
-				{
-					"id": "mirai-jira-issues",
-					"name": "Issues",
-					"when": "mirai-jira:authenticated"
-				},
-				{
-					"id": "mirai-jira-ai",
-					"name": "AI Tools",
-					"type": "webview",
-					"when": "mirai-jira:authenticated"
-				}
+			{
+				"id": "mirai-jira-issues",
+				"name": "Issues",
+				"when": "mirai-jira:authenticated"
+			}
 			],
 			"mirai-connections": [
 				{
@@ -250,7 +244,8 @@
 		],
 		"uriHandlers": [
 			{
-				"scheme": "mirai"
+				"scheme": "mirai",
+				"authority": "mirai.mirai-jira"
 			}
 		],
 		"configuration": {
@@ -378,12 +373,8 @@
 					"group": "1_filters"
 				}
 			],
-			"commandPalette": [
-				{
-					"command": "mirai-jira.openJiraPanel",
-					"when": "true"
-				},
-				{
+		"commandPalette": [
+			{
 					"command": "mirai-jira.authenticateWithToken",
 					"when": "true"
 				},
@@ -431,6 +422,11 @@
 					"command": "mirai-jira.estimateComplexity",
 					"when": "view == mirai-jira-issues && viewItem == issue",
 					"group": "ai@2"
+				},
+				{
+					"command": "mirai-jira.discoverReposForTicket",
+					"when": "view == mirai-jira-issues && viewItem == issue",
+					"group": "ai@3"
 				}
 			]
 		}

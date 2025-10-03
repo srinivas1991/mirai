@@ -11,6 +11,9 @@
 
 .explorer-folders-view .monaco-list-row {
 	padding-left: 4px; /* align top level twistie with `Explorer` title label */
+	transition: background-color 0.15s ease-in-out;
+	border-radius: 4px;
+	margin: 2px 4px;
 }
 
 .explorer-folders-view .explorer-folders-view.highlight .monaco-list .explorer-item:not(.explorer-item-edited),
@@ -20,8 +23,9 @@
 
 .explorer-folders-view .explorer-item,
 .explorer-folders-view .editor-group {
-	height: 22px;
-	line-height: 22px;
+	height: 24px;
+	line-height: 24px;
+	padding: 2px 0;
 }
 
 .explorer-folders-view .explorer-item {
@@ -109,4 +113,44 @@
 
 .monaco-workbench.context-menu-visible .explorer-folders-view.highlight .monaco-list-row {
 	outline: none !important;
+}
+
+/* Modern UI Enhancements */
+.explorer-folders-view .monaco-list-row:hover {
+	background-color: var(--vscode-list-hoverBackground);
+}
+
+.explorer-folders-view .monaco-list-row.selected,
+.explorer-folders-view .monaco-list-row.focused {
+	background-color: var(--vscode-list-activeSelectionBackground);
+}
+
+.explorer-folders-view .monaco-icon-label {
+	transition: transform 0.1s ease-in-out;
+}
+
+.explorer-folders-view .monaco-list-row:hover .monaco-icon-label {
+	transform: translateX(2px);
+}
+
+/* Smoother indent guides */
+.monaco-list .monaco-tl-indent {
+	opacity: 0.6;
+	transition: opacity 0.15s ease-in-out;
+}
+
+.monaco-list .monaco-list-row:hover .monaco-tl-indent {
+	opacity: 0.8;
+}
+
+/* Better visual feedback for file operations */
+.explorer-folders-view .explorer-item.cut {
+	opacity: 0.4;
+	filter: grayscale(50%);
+}
+
+.explorer-folders-view .monaco-icon-name-container {
+	display: flex;
+	align-items: center;
+	gap: 4px;
 }
